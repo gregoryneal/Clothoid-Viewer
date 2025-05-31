@@ -36,13 +36,13 @@ namespace Clothoid {
 
         public int PolylineCount { get { return this.inputPolyline.Count; } }
 
-        private List<Vector3> drawingNodes = new List<Vector3>();
-
         public float StartCurvature { get {
+            if (segments.Count == 0) return 0;
             return segments[0].StartCurvature;
         }}
 
         public float EndCurvature { get {
+            if (segments.Count == 0) return 0;
             return segments[^1].EndCurvature;
         }}
 
@@ -65,28 +65,27 @@ namespace Clothoid {
         /// As far as I know it is only used in the SinghMcCrae solution.
         /// </summary>
         /// <param name="CURVE_FACTOR"></param>
-        public ClothoidCurve(float CURVE_FACTOR=1) {
-            ClothoidSegment.CURVE_FACTOR = (float)System.Math.Sqrt(System.Math.PI/2);//CURVE_FACTOR;
+        public ClothoidCurve() {
             this.segments = new List<ClothoidSegment>();
             this.inputPolyline = new List<Vector3>();
         }
-        public ClothoidCurve(List<ClothoidSegment> orderedSegments, List<Vector3> inputPolyline, float CURVE_FACTOR = 1)
+        public ClothoidCurve(List<ClothoidSegment> orderedSegments, List<Vector3> inputPolyline)
         {
-            ClothoidSegment.CURVE_FACTOR = (float)System.Math.Sqrt(System.Math.PI / 2);//CURVE_FACTOR;
             this.segments = orderedSegments;
             this.inputPolyline = inputPolyline;
 
             this.EndpointAngle = orderedSegments.Sum(s => s.Rotation);
         }
-
-        public void AddBestFitTranslationRotation(Vector3 curveCM, Vector3 polylineCM, float bestRotate) {
-            this.curveCM = curveCM;
-            this.polylineCM = polylineCM;
-            this.polylineRotation = bestRotate;
-            Debug.Log($"Best rotation angle (degrees): {bestRotate}");
-        }
-
-        public void AddBestFitTranslationRotation(Vector3 curveCM, Vector3 polylineCM, double[][] bestRotate) {
+        
+        /// <summary>
+        /// Best fit translation and rotation are used when the curve is an approximation of your input polyline. 
+        /// This as of now is only used in the SinghMcCrae solution.
+        /// </summary>
+        /// <param name="curveCM"></param>
+        /// <param name="polylineCM"></param>
+        /// <param name="bestRotate"></param>
+        public void AddBestFitTranslationRotation(Vector3 curveCM, Vector3 polylineCM, double[][] bestRotate)
+        {
             this.curveCM = curveCM;
             this.polylineCM = polylineCM;
             this.rotationMatrix = bestRotate;
@@ -182,7 +181,6 @@ namespace Clothoid {
         /// <param name="unrotatedPoint"></param>
         /// <returns></returns>
         public Vector3 GetRotatedPoint(Vector3 unrotatedPoint, float degrees = 0) {
-            //return ClothoidSegment.RotateAboutAxis(unrotatedPoint, Vector3.up, degrees);
             return GetRotatedPoint(unrotatedPoint, this.rotationMatrix);
         }
 

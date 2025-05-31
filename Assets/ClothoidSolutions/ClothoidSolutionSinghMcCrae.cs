@@ -440,32 +440,14 @@ namespace Clothoid {
             SetPolyline(inputPolyline);
             this.segmentedLKNodes = SegmentedRegression3(this.LKNodeMap_orderedList, this.maxError);
             //normalize the segmented nodes for viewing on a plot
-            SegmentedLKNodes_scaled = new List<Vector3>();
+            /*SegmentedLKNodes_scaled = new List<Vector3>();
             for (int i = 0; i < segmentedLKNodes.Count; i++) {
                 SegmentedLKNodes_scaled.Add(new Vector3(segmentedLKNodes[i].x, segmentedLKNodes[i].y, segmentedLKNodes[i].z * maxNormalizedCurvature));
-            }
-            /*for (int i = 0; i < this.segmentedLKNodes.Count; i++) {
-                Debug.Log($"Segmented LK Node {i}: {segmentedLKNodes[i]}");
             }*/
-            //SetupCanonicalSegments(); //build the segmentTranslation and segmentYRotation lists
-            this.clothoidCurve = new ClothoidCurve(ClothoidSegment.GenerateSegmentsFromLKGraph(segmentedLKNodes), inputPolyline, (float)System.Math.Sqrt(System.Math.PI/2));
+            this.clothoidCurve = new ClothoidCurve(ClothoidSegment.GenerateSegmentsFromLKGraph(segmentedLKNodes), inputPolyline);
             SetupArcLengthSamples(); //collect samples on the curve based on the arc lengths of the polyline
             SetupFitTranslation(endpointWeight);
             SetupFitRotation3(); //use the previous sampled points to calculate the optimal translation and rotation offset for the curve
-            //SetupFitRotation(endpointWeight);
-
-            //CalculateTangentsAndNormals();
-            /*Debug.Log("====== Segment Offset Results ======");
-            for(int i = 0; i < this.segmentTranslation.Count; i++) {
-                Debug.Log($"trans: {segmentTranslation[i]}");
-                Debug.Log($"rot: {segmentYRotation[i]}");
-            } 
-            Debug.Log("=================================");
-            Debug.Log("====== Curve Fit Results ======");
-            Debug.Log($"trans: {this.fitTranslate}");
-            Debug.Log($"rot: {this.fitRotate}");
-            Debug.Log("=================================");*/
-            //this.clothoidCurve.AddBestFitTranslationRotation(this.cmCurve, this.FitTranslate, this.fitRotate);
             this.clothoidCurve.AddBestFitTranslationRotation(this.cmCurve, this.cmPolyline, this.rotationMatrix);
             return this.clothoidCurve;
         }

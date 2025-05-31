@@ -128,6 +128,13 @@ namespace Clothoid
         /// Get a G1 clothoid curve using two points and associated tangents.
         /// Angles should be in degrees.
         /// </summary>
+        /// <param name="x0"></param>
+        /// <param name="z0"></param>
+        /// <param name="t0"></param>
+        /// <param name="x1"></param>
+        /// <param name="z1"></param>
+        /// <param name="t1"></param>
+        /// <param name="addOffsets">If true, the returned curve will be offet and rotated by the first point and its tangent. We might want to leave it false if we are building a G1 spline, in which case we would only offset and rotate the entire G1 curve by the first point after building the whole thing. See <see cref="G1Spline"/></param>
         /// <returns></returns>
         public static ClothoidCurve G1Curve(double x0, double z0, double t0, double x1, double z1, double t1, bool addOffsets = false)
         {
