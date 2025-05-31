@@ -1,6 +1,8 @@
 # Clothoid-Viewer
 implementing solutions to some clothoid interpolation problems:
 
+A clothoid is a curve whose curvature varies linearly with respect to its arc length. In this repository I explore generation, segmentation, and interpolation of clothoids using various methods by people way smarter than me. 
+
 ### Building clothoid segments given arc length, initial curvature and curvature derivative, or arc length and initial and final curvature:
 
 https://github.com/user-attachments/assets/9cd0df39-32da-4ccb-aa55-787b6c9f2c3a
