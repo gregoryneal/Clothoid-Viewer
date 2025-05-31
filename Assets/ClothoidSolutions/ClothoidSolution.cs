@@ -9,7 +9,7 @@ namespace Clothoid {
     /// This is a generic class that implements specific clothoid segmentation algorithms. Given an input polyline (sequential list of points in space) this will return a
     /// ClothoidCurve object made up of an ordered list of derived ClothoidSegment.
     /// </summary>
-    public abstract class ClothoidSolution : MonoBehaviour {
+    public abstract class ClothoidSolution {
         protected List<ClothoidSegment> segments = new List<ClothoidSegment>();
         public List<Vector3> polyline { get; protected set; }
         public ClothoidCurve clothoidCurve { get; protected set; }

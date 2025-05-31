@@ -149,7 +149,7 @@ namespace Clothoid
 
         ClothoidCurve G1(HermiteData p1, HermiteData p2)
         {
-            return ClothoidSolutionBertolazzi.G1Curve(p1.x, p1.z, p1.tangentAngle, p2.x, p2.z, p2.tangentAngle);
+            return ClothoidSolutionBertolazzi.G1Curve(p1.x, p1.z, p1.tangentAngle, p2.x, p2.z, p2.tangentAngle, true);
         }
     }
 }

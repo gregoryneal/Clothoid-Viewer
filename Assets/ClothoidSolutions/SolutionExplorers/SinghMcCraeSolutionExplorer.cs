@@ -1,9 +1,7 @@
 using System.Collections.Generic;
 using Clothoid;
 using UnityEngine;
-using System.Linq;
 
-[RequireComponent(typeof(ClothoidSolutionSinghMcCrae))]
 public class SinghMcCraeSolutionExplorer : MonoBehaviour
 {
     [Header("To use this component press play and then draw in the game view. \nA clothoid curve approximating your input polyline will be \ngenerated using a method devised by Singh and McCrae. The input \npolyline will be converted into a sequence of 2D points in arc \nlength/curvature space. This graph will have segmented linear \nregression performed on it, and the resulting polyline in arc \nlength/curvature space will be used to generate curve segments. \nThe curve is generated in local space, so it needs to be matched \nwith the input polyline via 2D transformation and rotation, this \nis accomplished via singular value decomposition of some sample \npoints of the polyline and resulting curve.")]
@@ -16,8 +14,8 @@ public class SinghMcCraeSolutionExplorer : MonoBehaviour
     ClothoidSolutionSinghMcCrae solution;
 
     void Start()
-    {
-        solution = GetComponent<ClothoidSolutionSinghMcCrae>();
+    {//dsdfsdf
+        solution = new();
         LineRenderer[] lrs = GetComponentsInChildren<LineRenderer>();
         lr1 = lrs[0];
         lr2 = lrs[1];

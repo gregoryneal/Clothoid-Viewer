@@ -128,7 +128,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 145471755}
-  - component: {fileID: 145471754}
   - component: {fileID: 145471753}
   m_Layer: 0
   m_Name: clothoid viewer 1
@@ -136,7 +135,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &145471753
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -155,18 +154,6 @@ MonoBehaviour:
   endLR: {fileID: 293085825}
   curveLR: {fileID: 282962170}
   curveLR2: {fileID: 1602724421}
---- !u!114 &145471754
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 145471752}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b301fc494196a01439f217a2003a6384, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!4 &145471755
 Transform:
   m_ObjectHideFlags: 0
@@ -565,7 +552,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 703457109}
-  - component: {fileID: 703457108}
   - component: {fileID: 703457106}
   m_Layer: 0
   m_Name: clothoid viewer 2
@@ -587,23 +573,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   sampleArcLength: 1
---- !u!114 &703457108
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 703457105}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 71449e5030d7a0448a163b542442b9fd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  segmentedLKNodes: []
-  maxNormalizedCurvature: 10
-  cmPolyline: {x: 0, y: 0, z: 0}
-  cmCurve: {x: 0, y: 0, z: 0}
-  maxError: 0.01
 --- !u!4 &703457109
 Transform:
   m_ObjectHideFlags: 0
@@ -1194,7 +1163,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!120 &1907205978
 LineRenderer:
   serializedVersion: 2

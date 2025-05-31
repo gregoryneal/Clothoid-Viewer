@@ -123,7 +123,7 @@ namespace Clothoid {
         [Range(0f, 0.1f)]
         public float maxError = 0.01f;
         
-        void Start()
+        public ClothoidSolutionSinghMcCrae()
         {
             this.LKNodeMap = new Dictionary<Vector3, (float, float)>();
             this.LKNodeMap_norm = new Dictionary<Vector3, (float, float)>();
