@@ -1,15 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using UnityEditor.Experimental.GraphView;
 
 namespace Clothoid
 {
     public class ClothoidSolutionBertolazzi : ClothoidSolution
     {
 
-        
+
         const double EPS = 1e-15;
         const double PI = Math.PI;
         const double PI_2 = Math.PI / 2;
@@ -127,11 +125,9 @@ namespace Clothoid
         }
 
         /// <summary>
-        /// Get a G1 clothoid curve using two clothoid points. Note the curvatures of the ClothoidPoints will be ignored.
+        /// Get a G1 clothoid curve using two points and associated tangents.
         /// Angles should be in degrees.
         /// </summary>
-        /// <param name="point1"></param>
-        /// <param name="point2"></param>
         /// <returns></returns>
         public static ClothoidCurve G1Curve(double x0, double z0, double t0, double x1, double z1, double t1, bool addOffsets = false)
         {
@@ -146,63 +142,6 @@ namespace Clothoid
             double phi1 = NormalizeAngle((t1 * Math.PI / 180) - phi);
 
             double d = phi1 - phi0;
-
-
-            //check for special cases, recast and flag appropriately
-            //TODO: this
-            bool isMirrored = false;
-            bool isReversed = false;
-            /*
-                        if (phi1 > Math.Abs(phi0))
-                        {
-                            //normal
-                            UnityEngine.Debug.Log("Normal solution phi1 > |phi0|");
-                        }
-                        else if (phi1 < Math.Abs(phi0))
-                        {
-                            //reversed, swap points and negate tangents
-                            UnityEngine.Debug.Log("Reversed solution phi1 < |phi0|");
-                            isReversed = true;
-                            point1.tangentAngle *= -1;
-                            point2.tangentAngle *= -1;
-                            (point2, point1) = (point1, point2);
-
-                            phi0 = NormalizeAngle((point1.tangentAngle * Math.PI / 180) - phi);
-                            phi1 = NormalizeAngle((point2.tangentAngle * Math.PI / 180) - phi);
-                        }
-                        else if (phi0 < Math.Abs(phi1))
-                        {
-                            //mirrored reflect tangents across phi
-                            UnityEngine.Debug.Log("Mirrored solution phi0 < |phi1|");
-                            isMirrored = true;
-                            point1.tangentAngle = (2 * phi_deg) - point1.tangentAngle;
-                            point2.tangentAngle = (2 * phi_deg) - point2.tangentAngle;
-
-                            phi0 = NormalizeAngle((point1.tangentAngle * Math.PI / 180) - phi);
-                            phi1 = NormalizeAngle((point2.tangentAngle * Math.PI / 180) - phi);
-                        }
-                        else if (phi0 > Math.Abs(phi1))
-                        {
-                            //mirrored and reversed
-                            UnityEngine.Debug.Log("Mirrored and reversed solution phi0 > |phi1|");
-                            isMirrored = true;
-                            isReversed = true;
-
-                            point1.tangentAngle = point2.tangentAngle - (2 * phi_deg);
-                            point2.tangentAngle = point1.tangentAngle - (2 * phi_deg);
-
-                            phi0 = NormalizeAngle((point1.tangentAngle * Math.PI / 180) - phi);
-                            phi1 = NormalizeAngle((point2.tangentAngle * Math.PI / 180) - phi);
-                        }
-                        else if (phi0 == phi1 && phi0 == Math.PI)
-                        {
-                            UnityEngine.Debug.Log("phi0 == phi1");
-                        }
-                        else
-                        {
-                            UnityEngine.Debug.Log("phi0 == -phi1");
-                        }*/
-            //UnityEngine.Debug.Log($"phi0: {phi0} | phi1: {phi1}");
 
             double g;
             double dg;
@@ -224,7 +163,6 @@ namespace Clothoid
             {
             }*/
 
-            //https://github.com/ebertolazzi/Clothoids/blob/80a4ad090dc71df5f41137b0b88cc14265b4cd1a/src/Fresnel.cc#L322
             do
             {
                 //if (isMirrored && !isReversed) IntCS = GeneralizedFresnelCS(3, 2 * A, -d - A, -phi0);
@@ -247,8 +185,7 @@ namespace Clothoid
             //UnityEngine.Debug.Log($"Number of attempts: {u}");
             double[] intCS;
 
-            if (isMirrored || isReversed) intCS = GeneralizedFresnelCS(2 * -A, -d - A, phi0);
-            else intCS = GeneralizedFresnelCS(2 * A, d - A, phi0);
+            intCS = GeneralizedFresnelCS(2 * A, d - A, phi0);
             double s = r / intCS[0];
 
 
@@ -261,8 +198,6 @@ namespace Clothoid
 
             double startCurvature = (d - A) / s;
             double sharpness = (2 * A) / (s * s);
-
-            //if ()
 
             //ClothoidSegment segment = new ClothoidSegment((float)startCurvature, (float)sharpness, (float)s);
 
@@ -285,60 +220,6 @@ namespace Clothoid
             while (angle > Math.PI) angle -= 2 * Math.PI;
             while (angle < -Math.PI) angle += 2 * Math.PI;
             return angle;
-        }
-
-        private static Func<double, double> G(double phi0, double phi1)
-        {
-            return A =>
-            {
-                /*
-                double a = 2 * A;
-                double b = phi1 - phi0 - A;
-                double c = phi0;
-                if (a == 0)
-                {
-
-                }
-                else if (Math.Abs(a) < .0001)
-                {
-                    //use small series expansion
-                }
-                else
-                {
-
-                }*/
-                return F(y(2 * A, phi1 - phi0 - A, phi0));
-            };
-        }
-
-        private static Func<double, double> GPrime(double phi0, double phi1)
-        {
-            return A => F(x1(2 * A, phi1 - phi0 - A, phi0)) - F(x2(2 * A, phi1 - phi0 - A, phi0));
-        }
-
-        private static double F(Func<double, double> f)
-        {
-            return Mathc.SimpsonApproximation(0, 1, f, 6);
-        }
-
-        private static Func<double, double> y(double a, double b, double c)
-        {
-            return x => Math.Sin((a * x * x / 2) + (b * x) + c);
-        }
-
-        private static Func<double, double> x(double a, double b, double c)
-        {
-            return x => Math.Cos((a * x * x / 2) + (b * x) + c);
-        }
-
-        private static Func<double, double> x1(double a, double b, double c)
-        {
-            return x => x * Math.Cos((a * x * x / 2) + (b * x) + c);
-        }
-
-        private static Func<double, double> x2(double a, double b, double c)
-        {
-            return x => x * x * Math.Cos((a * x * x / 2) + (b * x) + c);
         }
 
         private static double InitialGuessA(double phi0, double phi1)
@@ -828,9 +709,4 @@ namespace Clothoid
             return points;
         }
     }
-}
-
-public static class Fresnel
-{
-    
 }
