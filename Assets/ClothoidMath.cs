@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+
 //using System.Numerics;
 using UnityEngine;
 
@@ -29,7 +30,6 @@ namespace Clothoid {
             return ClothoidSegment.RotateAboutAxis(new Vector3(1, 0, 0), Vector3.up, -angle);
         }
     }
-
 
     public static class Mathc
     {
@@ -202,59 +202,36 @@ namespace Clothoid {
         }
 
         /// <summary>
-        /// Checks if the three provided points are collinear in the XZ plane.
+        /// Checks if the three provided points are colinear in the XZ plane.
         /// </summary>
         /// <param name="point1"></param>
         /// <param name="point2"></param>
         /// <param name="point3"></param>
         /// <returns></returns>
-        public static bool AreCollinearPoints(Vector3 point1, Vector3 point2, Vector3 point3, float minError = 0.01f)
+        public static bool AreColinearPoints(Vector3 point1, Vector3 point2, Vector3 point3, float minError = 0.01f)
         {
-            return Mathf.Abs(((point2.z - point1.z) / (point2.x - point1.x)) - ((point3.z - point2.z) / (point3.x - point2.x))) < minError;
+            float dx1 = point2.x - point1.x;
+            float dx2 = point3.x - point2.x;
+
+            //Infinite slope1 and maybe infinite slope 2
+            if (dx1 == 0) return dx2 == 0;
+            //Infinite slope2 but finite slope1
+            else if (dx2 == 0) return false;
+            //Slope1 and slope2 are finite
+            else return Mathf.Abs(((point2.z - point1.z) / dx1) - ((point3.z - point2.z) / dx2)) < minError;
         }
 
-        /*
-                /// <summary>
-                /// Given three points in the XZ plane, find the center of the circle that passes through all of them.
-                /// </summary>
-                /// <param name="point1"></param>
-                /// <param name="point2"></param>
-                /// <param name="point3"></param>
-                /// <returns></returns>
-                public static Vector3 CenterOfCircleOfThreePoints(Vector3 point1, Vector3 point2, Vector3 point3) {
-                    float zDelta_a = point2.z - point1.z;
-                    float xDelta_a = point2.x - point1.x;
-                    float zDelta_b = point3.z - point2.z;
-                    float xDelta_b = point3.x - point2.x;
-
-                    //if any of the above values are zero that means two of our points lie on the x or z plane, which means 
-                    //the center lies on the z or x plane respectively. So lets just check manually whether to process the 
-                    //slopes or not.
-
-                    float centerX = 0;
-                    float centerZ = 0;
-
-                    if (xDelta_a != 0 && xDelta_b != 0) {}
-                    if (zDelta_a != 0 && zDelta_b != 0) {}
-
-                    float aSlope = zDelta_a / xDelta_a;
-                    float bSlope = zDelta_b / xDelta_b;
-                    float centerX = ((aSlope * bSlope * (point1.z - point3.z)) + (bSlope * (point1.x + point2.x)) - (aSlope * (point2.x + point3.x))) / (2 * (bSlope - aSlope));
-                    float centerZ = (-1f * (centerX - ((point1.x + point2.x) / 2f)) / aSlope) + ((point1.z + point2.z) / 2f);
-                    return new Vector3(centerX, 0, centerZ); 
-                }*/
-
         /// <summary>
-        /// Find a circle that goes through three points by finding the intersection of the perpendicular bisectors of two cords.
+        /// Find a circle that goes through three non-colinear points by finding the intersection of the perpendicular bisectors of two cords.
+        /// Be sure to handle colinearity seperately.
         /// </summary>
         /// <param name="point1"></param>
         /// <param name="point2"></param>
         /// <param name="point3"></param>
         /// <returns></returns>
-        public static bool CenterOfCircleOfThreePoints2(out Vector3 center, Vector3 point1, Vector3 point2, Vector3 point3)
+        public static bool CenterOfCircleOfThreePoints(out Vector3 center, Vector3 point1, Vector3 point2, Vector3 point3)
         {
             center = point1;
-
             //chord of point1 and 2
             (float, float) line1 = EquationOfLineFromTwoPoints(point1, point2);
             //chord of point2 and 3
@@ -271,7 +248,7 @@ namespace Clothoid {
                 center = intersection;
                 return true;
             }
-
+            //Debug.LogError($"Error with chord bisection algorithm => Point1: {point1} | Point2: {point2} | Point3: {point3}");
             return false;
         }
 
@@ -325,7 +302,11 @@ namespace Clothoid {
                     xValue = point1.x;
                     yValue = point1.z;
                 }
-                else return false; //different horizontal lines
+                else
+                {
+                    //Debug.LogError($"Slope1: {slope1} | Slope2: {slope2} | Intercept1: {int1} | Intercept2: {int2}");
+                    return false;
+                } //different horizontal lines
             }
             else
             {
@@ -333,10 +314,10 @@ namespace Clothoid {
                 yValue = (slope1 * xValue) + int1; //y = mx + b
             }
 
-            if (float.IsNaN(xValue) || float.IsNaN(yValue))
+            /*if (float.IsNaN(xValue) || float.IsNaN(yValue))
             {
                 Debug.Log($"Error nan value: intercept 1: {int1} | intercept 2: {int2} | slope 1: {slope1} | slope 2: {slope2} | point 1: {point1} | point 2: {point2}");
-            }
+            }*/
 
             intersection = new Vector3(xValue, 0, yValue);
 
