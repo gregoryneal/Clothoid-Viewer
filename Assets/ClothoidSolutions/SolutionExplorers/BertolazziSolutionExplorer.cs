@@ -11,9 +11,9 @@ namespace Clothoid
 
         private Vector3 start = new Vector3(-1, 0, 0);
         private Vector3 end = new Vector3(1, 0, 0);
-        [Range(-360f, 360)]
+        [Range(-180f, 180f)]
         public float startAngle = 60;
-        [Range(-360f, 360)]
+        [Range(-180f, 180f)]
         public float endAngle = 210;
         public LineRenderer startLR;
         public LineRenderer endLR;

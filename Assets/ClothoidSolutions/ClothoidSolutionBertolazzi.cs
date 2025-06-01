@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Unity.Mathematics;
 
 namespace Clothoid
 {
@@ -9,7 +10,6 @@ namespace Clothoid
 
 
         const double EPS = 1e-15;
-        const double PI = Math.PI;
         const double PI_2 = Math.PI / 2;
 
 
@@ -71,16 +71,14 @@ namespace Clothoid
 
 
         /// <summary>
-        /// Allowable error in the solutions
+        /// Threshold for A to solve the fresnel equation with different domains
         /// </summary>
-        public static double A_THRESHOLD = .01;
+        public static double A_THRESHOLD = 1E-2;
         public static int A_SERIE_SIZE = 3;
         private static double ROOT_TOLERANCE = 1E-2;
-        private static double ROOT_TOLERANCE_FORGIVENESS = 1; //can't find a root with tolerance ROOT_TOLERANCE? use this one as a secondary "at least" condition.
+        private static double ROOT_TOLERANCE_FORGIVENESS = 1E-1; //can't find a root with tolerance ROOT_TOLERANCE? use this one as a secondary "at least" condition.
         private static readonly double[] CF = new double[6] { 2.989696028701907, 0.716228953608281, -0.458969738821509, -0.502821153340377, 0.261062141752652, -0.045854475238709 };
 
-        private float solvedCurvature = 0;
-        private float solvedSharpness = 0;
         public override ClothoidCurve CalculateClothoidCurve(List<UnityEngine.Vector3> inputPolyline, float allowableError = 0.1F, float endpointWeight = 1)
         {
             throw new System.NotImplementedException();
@@ -89,12 +87,7 @@ namespace Clothoid
         public static ClothoidCurve BuildSegmentsFromStandardFrame(HermiteData point1, HermiteData point2)
         {
             List<ClothoidSegment> segments = new List<ClothoidSegment>();
-
             if (point1.x != -1 || point1.z != 0 || point2.x != 1 || point2.z != 0) return ClothoidCurve.FromSegments(segments);
-
-
-
-
             return ClothoidCurve.FromSegments(segments);
         }
 
@@ -157,31 +150,15 @@ namespace Clothoid
 
             double A = InitialGuessA(phi0, phi1);
 
-            /*
-            //Line segment
-            if (A < A_THRESHOLD && d - A < A_THRESHOLD)
-            {
-                ClothoidCurve cc = new ClothoidCurve().AddSegment(new ClothoidSegment(0, 0, (float)r));
-                cc.Offset = point1.Position.ToUnityVector3();
-                cc.AngleOffset = (float)point1.tangentAngle;
-                return cc;
-            }
-            else if (A < A_THRESHOLD)
-            {
-            }*/
-
             do
             {
-                //if (isMirrored && !isReversed) IntCS = GeneralizedFresnelCS(3, 2 * A, -d - A, -phi0);
-                //else if (isReversed && !isMirrored) IntCS = GeneralizedFresnelCS(3, 2 * A, d - A, -phi1);
-                //else if (isReversed && isMirrored) IntCS = GeneralizedFresnelCS(3, 2 * A, d - A, -phi1);
                 IntCS = GeneralizedFresnelCS(3, 2 * A, d - A, phi0);
                 g = IntCS[1][0];
                 dg = IntCS[0][2] - IntCS[0][1];
                 A -= g / dg;//
             } while (++u < 20 && Math.Abs(g) > ROOT_TOLERANCE);
 
-            if (Math.Abs(g) > ROOT_TOLERANCE)
+            if (Math.Abs(g) > ROOT_TOLERANCE_FORGIVENESS)
             {
                 UnityEngine.Debug.LogWarning($"No root found! (g, tol, tol2): ({g}, {ROOT_TOLERANCE}, {ROOT_TOLERANCE_FORGIVENESS})");
                 //Assert.IsTrue(Math.Abs(g) <= ROOT_TOLERANCE);
@@ -463,6 +440,72 @@ namespace Clothoid
         }
 
         /// <summary>
+        /// More closely resembles the paper.
+        /// </summary>
+        /// <param name="nk"></param>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        private static List<double[]> EvalXYaLarge2(int nk, double a, double b)
+        {
+            if (nk > 3 || nk < 0) throw new ArgumentOutOfRangeException();
+
+            double[] X = new double[3];
+            double[] Y = new double[3];
+
+            double s = Math.Sign(a);
+            double absa = Math.Abs(a);
+            double z = s * Math.Sqrt(absa / Math.PI);
+            double wm = b / Math.Sqrt(Math.PI * absa);
+            double wp = wm + z;
+            double n = -b * b / (2 * a);
+            double cz = Math.Cos(n) / z;
+            double sz = Math.Sin(n) / z;
+
+            List<double[]> CSp = FresnelCS(3, wp);
+            List<double[]> CSm = FresnelCS(3, wm);
+
+            double dC0 = CSp[0][0] - CSm[0][0];
+            double dS0 = CSp[1][0] - CSm[1][0];
+
+            X[0] = cz * dC0 - (s * sz * dS0);
+            Y[0] = sz * dC0 + (s * cz * dS0);
+
+            if (nk > 1)
+            {
+                cz /= z;
+                sz /= z;
+                dC0 *= -wm;
+                dS0 *= -wm;
+
+                double dC1 = CSp[0][1] - CSm[0][1];
+                double dS1 = CSp[1][1] - CSm[1][1];
+
+                X[1] = cz * (dC0 + dC1) - (s * sz * (dS0 + dS1));
+                Y[1] = sz * (dC0 + dC1) + (s * cz * (dS0 + dS1));
+
+                if (nk > 2)
+                {
+                    cz /= z;
+                    sz /= z;
+                    dC0 *= -wm;
+                    dS0 *= -wm;
+                    dC1 *= -2 * wm;
+                    dS1 *= -2 * wm;
+
+                    double dC2 = CSp[0][2] - CSm[0][2];
+                    double dS2 = CSp[1][1] - CSm[1][1];
+
+                    X[2] = cz * (dC0 + dC1 + dC2) - (s * sz * (dS0 + dS1 + dS2));
+                    Y[2] = sz * (dC0 + dC1 + dC2) + (s * cz * (dS0 + dS1 + dS2));
+                }
+            }
+
+            return new List<double[]> { X, Y };
+
+        }
+        /// <summary>
         /// Evaluate the fresnel integral and its momenta at arc length t
         /// </summary>
         /// <param name="nk"></param>
@@ -574,7 +617,7 @@ namespace Clothoid
             else
             {
                 // x >= 6.0; asymptotic expansions for f and g
-                double s = PI * x * x;
+                double s = Math.PI * x * x;
                 double t = -1 / (s * s);
 
                 // Expansion for f
@@ -598,7 +641,7 @@ namespace Clothoid
                     oldterm = absterm;
                 } while (absterm > eps10 * Math.Abs(sum));
 
-                double f = sum / (PI * x);
+                double f = sum / (Math.PI * x);
 
                 // Expansion for g
                 numterm = -1.0;
@@ -619,7 +662,7 @@ namespace Clothoid
                     oldterm = absterm;
                 } while (absterm > eps10 * Math.Abs(sum));
 
-                double g = sum / ((PI * x) * (PI * x * x));
+                double g = sum / ((Math.PI * x) * (Math.PI * x * x));
 
                 double U = PI_2 * (x * x);
                 double SinU = Math.Sin(U);
@@ -645,7 +688,7 @@ namespace Clothoid
             List<double[]> CS;
 
             if (Math.Abs(a) < A_THRESHOLD) CS = EvalXYaSmall(nk, a, b, A_SERIE_SIZE);
-            else CS = EvalXYaLarge(nk, a, b);
+            else CS = EvalXYaLarge2(nk, a, b);
 
             double xx;
             double yy;
