@@ -15,7 +15,7 @@ https://github.com/user-attachments/assets/f9f66b3a-a745-474b-ba9d-5b8d3df06682
 
 https://github.com/user-attachments/assets/e88b24a1-f352-46de-a81d-6636e61771f3
 
-
 ### G1 fitting via Bertolazzi & Frego:
 
-https://github.com/user-attachments/assets/57600922-f17b-4524-b24e-675d73c0ad32
+https://github.com/user-attachments/assets/67e96504-51fe-4144-a0d7-c478f19c5ba5
+
