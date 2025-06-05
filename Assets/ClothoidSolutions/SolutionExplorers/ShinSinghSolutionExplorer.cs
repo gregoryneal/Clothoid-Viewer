@@ -24,14 +24,6 @@ namespace Clothoid {
 
         void Start() {
             awake = true;
-            /*
-            startGO = GameObject.CreatePrimitive(PrimitiveType.Sphere);            
-            startGO.transform.localScale = Vector3.one * 2;
-            startGO.GetComponent<Renderer>().material.color = Color.green;
-            endGO = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            endGO.transform.localScale = Vector3.one * 2;
-            endGO.GetComponent<Renderer>().material.color = Color.red;
-            */
 
             Helpers.DrawOrderedVector3s(pointList, this.pointListLR);
             solution = new ClothoidSolutionShinSingh();

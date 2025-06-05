@@ -9,23 +9,13 @@ namespace Clothoid
     public class StandardFrame
     {
         HermiteData[] points;
-        HermiteData[] scaledPoints;
-        double[] d;
-        double[] phi;
-        double[] gamma;
         public StandardFrame(params HermiteData[] points)
         {
             this.points = points;
-            d = new double[points.Length];
-            phi = new double[points.Length];
-            gamma = new double[points.Length];
         }
 
         public static HermiteData[] CastToStandardFrame(HermiteData[] points) {
             HermiteData[] p = new HermiteData[points.Length];
-            double d;
-            double phi;
-            double gamma;
             for (int i = 0; i < points.Length; i++)
             {
 

@@ -137,7 +137,7 @@ namespace Clothoid {
             float curvature;
             Vector3 tangent;
             Vector3 circleCenter;
-            bool areCollinear = Mathc.AreCollinearPoints(point1, point2, point3);
+            bool areCollinear = Mathc.AreColinearPoints(point1, point2, point3);
             bool foundCenter = false;
             if (areCollinear) {
                 curvature = 0;
@@ -155,7 +155,7 @@ namespace Clothoid {
                 }
             } else {
                 curvature = Mathc.MoretonSequinCurvature(point1, point2, point3);
-                if (Mathc.CenterOfCircleOfThreePoints2(out Vector3 center, point1, point2, point3)) {
+                if (Mathc.CenterOfCircleOfThreePoints(out Vector3 center, point1, point2, point3)) {
                     circleCenter = center;
                     //tangent slope is negative reciprocal of normal slope since they are orthogonal.
                     tangent = new Vector3(z - circleCenter.z, 0, -(x - circleCenter.x));
@@ -164,7 +164,7 @@ namespace Clothoid {
 
                 } else {
                     //we shouldn't get here so we can use this as debug.
-                    Debug.LogError("Warning, something is wrong with the center of the circle calculations!");
+                    Debug.LogError($"Warning, something is wrong with the center of the circle calculations! Points: ({point1.x}, {point1.z}) | ({point2.x}, {point2.z}) | ({point3.x}, {point3.z})  || Colinear: {areCollinear}");
                     circleCenter = point1;
                     tangent = Vector3.zero;
                 }

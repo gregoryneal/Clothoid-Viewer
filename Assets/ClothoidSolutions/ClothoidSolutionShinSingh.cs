@@ -17,11 +17,6 @@ namespace Clothoid {
     public class ClothoidSolutionShinSingh : ClothoidSolution
     {
         /// <summary>
-        /// This controls how many degrees each successive tangent vectors of the input polyline.
-        /// </summary>
-        private float minAngleDeviationDegrees = 1f;
-
-        /// <summary>
         /// A posture at index i is a circle that passes through the indexed polyline points i-1, i, i+1.
         /// The posture for i = 0 and i = Postures.Count-1 are defined by the circle connecting the first three
         /// and last three nodes respectively.
@@ -432,7 +427,6 @@ namespace Clothoid {
         }
 
         public static IEnumerator<ClothoidCurve> SolveClothoidParameters(Posture posture1, Posture posture2) {
-            int solverIntervals = 4;
             List<ClothoidSegment> segments = new List<ClothoidSegment>();
             int sign;
             double ki;
@@ -440,7 +434,6 @@ namespace Clothoid {
             //angles of small circular arc segment of the posture circles
             double thetao;
             double thetaf;
-            double angle;
             double s11;
             double s22;
             //circular arc lengths for current estimation values of l1 and l2.
@@ -452,11 +445,6 @@ namespace Clothoid {
             //perturb the arc lengths based on the difference between the guess and the goal positions (maybe i havent tried it yet it might suck)
             //s1[i] = s1 * i * pa * dist(guess, goal)
             double s3; //final arc length that is calculated from l1 and l2
-            //vectors pointing from the circle center to the posture points
-            UnityEngine.Vector3 v1;
-            UnityEngine.Vector3 v2;
-            UnityEngine.Vector3 v3;
-            UnityEngine.Vector3 v4;
 
             //Quadratic equation parameters
             double a;
@@ -484,8 +472,6 @@ namespace Clothoid {
 
             //final position guess
             UnityEngine.Vector3 guess;
-            double guessx;
-            double guessz;
             //temp variable to find min distance from guess to goal
             float minDist = Mathf.Infinity;
             float goalDist = 0.01f;

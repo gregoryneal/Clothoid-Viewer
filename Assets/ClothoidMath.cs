@@ -855,7 +855,7 @@ namespace Clothoid {
             }
             return sum;
         }
-        
+
         public static System.Numerics.BigInteger GetBinCoeff(long N, long K)
         {
             // This function gets the total number of unique combinations based upon N and K.
@@ -874,6 +874,19 @@ namespace Clothoid {
                 r /= d;
             }
             return r;
+        }
+        
+        /// <summary>
+        /// Factorial an integer
+        /// </summary>
+        /// <param name="f"></param>
+        /// <returns></returns>
+        public static int Fact(int f)
+        {
+            if (f == 0)
+                return 1;
+            else
+                return f * Fact(f - 1);
         }
     }
 }

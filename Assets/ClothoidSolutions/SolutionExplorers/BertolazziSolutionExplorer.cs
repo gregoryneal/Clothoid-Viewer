@@ -9,8 +9,14 @@ namespace Clothoid
     {
         bool awake = false;
 
-        private Vector3 start = new Vector3(-1, 0, 0);
-        private Vector3 end = new Vector3(1, 0, 0);
+        public Vector3 start = new Vector3(-1, 0, 0);
+        public Vector3 end = new Vector3(1, 0, 0);
+        bool shouldDraw = false;
+        public bool canvasDraw = false;
+        List<Vector3> drawingPoints = new List<Vector3>();
+        Vector3 lastSample;
+        [Range(.2f, 2)]
+        public float sampleArcLength = 1f;
         [Range(-180f, 180f)]
         public float startAngle = 60;
         [Range(-180f, 180f)]
@@ -52,7 +58,7 @@ namespace Clothoid
                 Helpers.DrawOrderedVector3s(c.GetSamples(100), curveLR2);
                 //Helpers.DrawOrderedVector3s(ClothoidSolutionBertolazzi.Eval(p[3], p[1], p[0], p[2], new System.Numerics.Vector3((float)p1.x, 0, (float)p1.z), 100), curveLR);
 
-                Debug.Log(c.ToString());
+               // Debug.Log(c.ToString());
             }
         }
 
@@ -117,7 +123,7 @@ namespace Clothoid
         public IEnumerator G1AngleStressTest2()
         {
             ClothoidCurve c;
-            float inc = 2f;
+            float inc = 1f;
 
             for (float phi0 = -179; phi0 < 179; phi0 += inc)
             {
@@ -135,7 +141,49 @@ namespace Clothoid
 
         void Update()
         {
-            
+            //Drawing points
+            if (Input.GetMouseButton(0))
+            {
+                shouldDraw = true;
+            }
+            else
+            {
+                //Reset the drawing points
+                if (shouldDraw)
+                {
+                    Vector3[] points = new Vector3[drawingPoints.Count];
+                    drawingPoints.CopyTo(points, 0);
+                    drawingPoints.Clear();
+                    shouldDraw = false;
+                }
+            }
+
+            if (shouldDraw && canvasDraw)
+            {
+                Vector2 mousePixels = Input.mousePosition; //bottom left is 0,0
+                Vector3 worldPos = Camera.main.ScreenToWorldPoint(new Vector3(mousePixels.x, mousePixels.y, Camera.main.transform.position.y));
+                if (lastSample == null) lastSample = worldPos;
+                else if (Vector3.Distance(worldPos, lastSample) >= sampleArcLength)
+                {
+                    drawingPoints.Add(worldPos);
+                    //Helpers.DrawOrderedVector3s(drawingPoints, this.curveLR2);
+                    lastSample = worldPos;
+                }
+
+                //Update curve
+                if (drawingPoints.Count > 3)
+                {
+                    //MakeCoolGraph();
+                    RedrawCurve();
+                }
+            }
+        }
+
+        void RedrawCurve()
+        {
+            Posture[] postures = Posture.CalculatePostures(drawingPoints).ToArray();
+            ClothoidCurve c = ClothoidSolutionBertolazzi.G1Spline(postures);
+            Helpers.DrawOrderedVector3s(c.GetSamples(c.Count * 100), this.curveLR);
         }
 
         void OnValidate()

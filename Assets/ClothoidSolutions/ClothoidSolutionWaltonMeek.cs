@@ -16,8 +16,6 @@ namespace Clothoid {
             Vector3 startPosition;
             Vector3 endPosition;
             Vector3 endTangent;
-            float W;
-            bool isMirrored;
             Posture sp;
             Posture ep;
             for (int i = 0; i + 1 < postures.Count; i++) {
@@ -48,9 +46,7 @@ namespace Clothoid {
                         if (startPosition.z > endPosition.z) {
                             endPosition = new Vector3(endPosition.x, endPosition.y, -endPosition.z);
                             endTangent = new Vector3(endTangent.x, endTangent.y, -endTangent.z);
-                            isMirrored = true;
                         } else {
-                            isMirrored = false;
                         }
 
                         endAngle = Mathf.Atan2(endTangent.z, endTangent.x);

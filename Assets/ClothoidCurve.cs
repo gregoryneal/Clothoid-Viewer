@@ -17,7 +17,7 @@ namespace Clothoid {
         /// </summary>
         public Vector3 Offset = Vector3.zero;
         /// <summary>
-        /// Overall angle offset of the curve. This should be close to if not equal to the first Posture's tangent angle. 
+        /// Overall angle offset of the curve in degrees. This should be close to if not equal to the first Posture's tangent angle. 
         /// </summary>
         public float AngleOffset = 0;
 
@@ -305,23 +305,34 @@ namespace Clothoid {
             return AddSegments(circularSegment);
         }
 
-        public static ClothoidCurve GetRandomCurve() {
+        public ClothoidCurve AddLine(float length)
+        {
+            return AddSegment(new ClothoidSegment(0, 0, length));
+        }
+
+        public static ClothoidCurve GetRandomCurve()
+        {
             ClothoidCurve c = new ClothoidCurve();
             float sharpness;
             float startCurvature;
             float newArcLength = UnityEngine.Random.Range(5, 9);
             float shape = 0.5f;// UnityEngine.Random.value;
-            if (shape > .66f) {
+            if (shape > .66f)
+            {
                 //line
                 sharpness = 0;
                 startCurvature = 0;
-            } else if (shape < .33f) {
+            }
+            else if (shape < .33f)
+            {
                 //circle
                 sharpness = 0;
                 startCurvature = UnityEngine.Random.Range(-.5f, .5f);
-            } else {
+            }
+            else
+            {
                 //clothoid
-                sharpness = UnityEngine.Random.Range(-.03f,.03f);
+                sharpness = UnityEngine.Random.Range(-.03f, .03f);
                 startCurvature = UnityEngine.Random.Range(-.3f, .3f);
             }
             ClothoidSegment newSegment = new ClothoidSegment(startCurvature, sharpness, newArcLength);

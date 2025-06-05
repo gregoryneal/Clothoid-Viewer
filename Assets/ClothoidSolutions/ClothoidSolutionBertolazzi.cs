@@ -1,18 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
-using Unity.Mathematics;
 
 namespace Clothoid
 {
     public class ClothoidSolutionBertolazzi : ClothoidSolution
     {
-
-
-        const double EPS = 1e-15;
-        const double PI_2 = Math.PI / 2;
-
-
         static readonly double[] fn = new double[11] {
             0.49999988085884732562,
             1.3511177791210715095,
@@ -67,16 +61,25 @@ namespace Clothoid
             0.0044099273693067311209,
             -0.00009070958410429993314
         };
-
-
-
+        /// <summary>
+        /// And epsilon for the fresnel calculations
+        /// </summary>
+        const double EPS = 1e-15;
+        const double PI_2 = Math.PI / 2;
         /// <summary>
         /// Threshold for A to solve the fresnel equation with different domains
         /// </summary>
         public static double A_THRESHOLD = 1E-2;
-        public static int A_SERIE_SIZE = 3;
+        /// <summary>
+        /// When A is small the momenta integrals are evaluated with an infinite series.
+        /// Turns out this series converges very fast so we only need the first few terms.
+        /// This is that number of terms.
+        /// </summary>
+        public static int A_SMALL_SERIES_SIZE = 3;
+        /// <summary>
+        /// Root finding tolerance
+        /// </summary>
         private static double ROOT_TOLERANCE = 1E-2;
-        private static double ROOT_TOLERANCE_FORGIVENESS = 1E-1; //can't find a root with tolerance ROOT_TOLERANCE? use this one as a secondary "at least" condition.
         private static readonly double[] CF = new double[6] { 2.989696028701907, 0.716228953608281, -0.458969738821509, -0.502821153340377, 0.261062141752652, -0.045854475238709 };
 
         public override ClothoidCurve CalculateClothoidCurve(List<UnityEngine.Vector3> inputPolyline, float allowableError = 0.1F, float endpointWeight = 1)
@@ -108,7 +111,7 @@ namespace Clothoid
 
             for (int i = 0; i + 1 < data.Length; i++)
             {
-                c += G1Curve(data[i].X, data[i].Z, data[i].Angle, data[i + 1].X, data[i + 1].Z, data[i + 1].Angle);
+                c += G1Curve(data[i].X, data[i].Z, data[i].Angle, data[i + 1].X, data[i + 1].Z, data[i + 1].Angle, false);
             }
 
             c.Offset = data[0].Position;
@@ -129,17 +132,145 @@ namespace Clothoid
         /// <param name="t1"></param>
         /// <param name="addOffsets">If true, the returned curve will be offet and rotated by the first point and its tangent. We might want to leave it false if we are building a G1 spline, in which case we would only offset and rotate the entire G1 curve by the first point after building the whole thing. See <see cref="G1Spline"/></param>
         /// <returns></returns>
-        public static ClothoidCurve G1Curve(double x0, double z0, double t0, double x1, double z1, double t1, bool addOffsets = false)
+        public static ClothoidCurve G1Curve(double x0, double z0, double t0, double x1, double z1, double t1, bool addOffsets)
         {
             double dx = x1 - x0;
             double dz = z1 - z0;
 
             double phi = Math.Atan2(dz, dx);
-            double phi_deg = phi * 180 / Math.PI;
+            //double phi_deg = phi * 180 / Math.PI;
             double r = Math.Sqrt((dx * dx) + (dz * dz));
 
+            //NOTE: At the moment I have t1 and t0 swapped to test
+            //solving the root for the curve rotated by 180 deg. 
+            //Then rotating the solution curve by another 180 deg.
             double phi0 = NormalizeAngle((t0 * Math.PI / 180) - phi);
             double phi1 = NormalizeAngle((t1 * Math.PI / 180) - phi);
+
+            double e = 1E-4;
+            //UnityEngine.Debug.Log($"phi0: {phi0} | phi1: {phi1}");
+            if ((Math.Abs(phi0) < e && Math.Abs(phi1) == 0) || (phi0 + Math.PI < e && phi1 - Math.PI < e) || (phi0 - Math.PI < e && phi1 + Math.PI < e))
+            {
+                //UnityEngine.Debug.Log("G1 Curve is a line!");
+                ClothoidCurve cc = new ClothoidCurve().AddLine((float)r);
+                if (addOffsets)
+                {
+                    cc.Offset = new UnityEngine.Vector3((float)x1, 0, (float)z1);
+                    cc.AngleOffset = (float)t0;
+                }
+                return cc;
+            }
+
+            double d = phi1 - phi0;
+            double absd = Math.Abs(d);
+
+            //Calculate the bounds of the solution A_max and T_max
+            double Tmax = Math.Max(0, PI_2 + (Math.Sign(phi1) * phi0));
+            double Amax = Tmax == 0 ? absd : absd + (2 * Tmax * (1 + Math.Sqrt(1 + (absd / Tmax))));
+
+            double g;
+            double dg;
+            List<double[]> IntCS;
+            int u = 0;
+
+            double A = InitialGuessA(phi0, phi1);
+            //UnityEngine.Debug.LogWarning($"A guess: {A}");
+            do
+            {
+                IntCS = GeneralizedFresnelCS(3, 2 * A, d - A, phi0);
+                g = IntCS[1][0];
+                dg = IntCS[0][2] - IntCS[0][1];
+                A -= g / dg;//
+                //UnityEngine.Debug.LogWarning($"u: {u} | g: {g} | dg: {dg} | new A -= {g / dg}: {A}");
+            } while (++u < 30 && Math.Abs(g) > ROOT_TOLERANCE);
+
+            if (Math.Abs(g) > ROOT_TOLERANCE)
+            {
+                UnityEngine.Debug.LogWarning($"No root found! (g, tol, tol2): ({g}, {ROOT_TOLERANCE})");
+                //Assert.IsTrue(Math.Abs(g) <= ROOT_TOLERANCE);
+                //could not find a root
+                //return new ClothoidCurve();
+            }
+            else
+            {
+                UnityEngine.Debug.Log($"Convergence iterations: {u}\nAmax: {Amax}\nTmax: {Tmax}\nA: {A}");
+            }
+
+            //UnityEngine.Debug.Log($"Number of attempts: {u}");
+            double[] intCS;
+
+            intCS = GeneralizedFresnelCS(2 * A, d - A, phi0);
+            double s = r / intCS[0];
+
+
+            //Assert.IsTrue(s > 0);
+            if (s <= 0)
+            {
+                //UnityEngine.Debug.LogWarning($"ArcLength Negative or Zero! s: {s} | r: {r} | intCS[0]: {intCS[0]} | intCS[1]: {intCS[1]} | phi0: {phi0 * 180 / Math.PI} | phi1: {phi1 * 180 / Math.PI} | A: {A} | d: {d * 180 / Math.PI}");
+                return G1CurveM(x0, z0, t0, x1, z1, t1, addOffsets);
+            }
+
+            double startCurvature = (d - A) / s;
+            double sharpness = (2 * A) / (s * s);
+
+            //ClothoidSegment segment = new ClothoidSegment((float)startCurvature, (float)sharpness, (float)s);
+
+            ClothoidCurve c = new ClothoidCurve().AddSegment(new ClothoidSegment((float)startCurvature, (float)sharpness, (float)s));
+            if (addOffsets)
+            {
+                c.Offset = new UnityEngine.Vector3((float)x0, 0, (float)z0);
+                c.AngleOffset = (float)t0;
+            }
+            return c;
+        }
+
+        /// <summary>
+        /// Solve the G1 curve by reflecting it across the origin, do this by simply swapping the tangent points and solving the G1 curve again,
+        /// then setting the offset to the final point, and the angle offset to t1 + 180.
+        /// </summary>
+        /// <param name="x0"></param>
+        /// <param name="z0"></param>
+        /// <param name="t0"></param>
+        /// <param name="x1"></param>
+        /// <param name="z1"></param>
+        /// <param name="t1"></param>
+        /// <param name="addOffsets"></param>
+        /// <returns></returns>
+        public static ClothoidCurve G1CurveM(double x0, double z0, double t0, double x1, double z1, double t1, bool addOffsets)
+        /*{
+            ClothoidCurve c = G1Curve(x0, z0, t1, x1, z1, t0, false);
+            if (addOffsets)
+            {
+                c.Offset = new UnityEngine.Vector3((float)x1, 0, (float)z1);
+                c.AngleOffset = (float)t1 + 180;
+            }
+            return c;
+        }*/
+        {
+            double dx = x1 - x0;
+            double dz = z1 - z0;
+
+            double phi = Math.Atan2(dz, dx);
+            double r = Math.Sqrt((dx * dx) + (dz * dz));
+
+            //NOTE: At the moment I have t1 and t0 swapped to test
+            //solving the root for the curve rotated by 180 deg. 
+            //Then rotating the solution curve by another 180 deg.
+            double phi0 = NormalizeAngle((t1 * Math.PI / 180) - phi);
+            double phi1 = NormalizeAngle((t0 * Math.PI / 180) - phi);
+
+            double e = 1E-4;
+            if ((Math.Abs(phi0) < e && Math.Abs(phi1) == 0) || (phi0 + Math.PI < e && phi1 - Math.PI < e) || (phi0 - Math.PI < e && phi1 + Math.PI < e))
+            {
+                UnityEngine.Debug.Log("G1 Curve is a line!");
+                ClothoidCurve cc = new ClothoidCurve().AddLine((float)r);
+                if (addOffsets)
+                {
+                    cc.Offset = new UnityEngine.Vector3((float)x1, 0, (float)z1);
+                    cc.AngleOffset = (float)t0;
+                }
+                return cc;
+            }
 
             double d = phi1 - phi0;
 
@@ -156,11 +287,12 @@ namespace Clothoid
                 g = IntCS[1][0];
                 dg = IntCS[0][2] - IntCS[0][1];
                 A -= g / dg;//
+                //UnityEngine.Debug.LogWarning($"u: {u} | g: {g} | dg: {dg} | A: {A}");
             } while (++u < 20 && Math.Abs(g) > ROOT_TOLERANCE);
 
-            if (Math.Abs(g) > ROOT_TOLERANCE_FORGIVENESS)
+            if (Math.Abs(g) > ROOT_TOLERANCE)
             {
-                UnityEngine.Debug.LogWarning($"No root found! (g, tol, tol2): ({g}, {ROOT_TOLERANCE}, {ROOT_TOLERANCE_FORGIVENESS})");
+                UnityEngine.Debug.LogWarning($"No root found! (g, tol, tol2): ({g}, {ROOT_TOLERANCE})");
                 //Assert.IsTrue(Math.Abs(g) <= ROOT_TOLERANCE);
                 //could not find a root
                 return new ClothoidCurve();
@@ -177,7 +309,12 @@ namespace Clothoid
             if (s <= 0)
             {
                 UnityEngine.Debug.LogWarning($"ArcLength Negative or Zero! s: {s} | r: {r} | intCS[0]: {intCS[0]} | intCS[1]: {intCS[1]} | phi0: {phi0 * 180 / Math.PI} | phi1: {phi1 * 180 / Math.PI} | A: {A} | d: {d * 180 / Math.PI}");
-                if (s <= 0) return new ClothoidCurve();
+
+                //intCS = GeneralizedFresnelCS(2 * -A, d + A, phi0);
+                //s = r / intCS[0];
+
+                UnityEngine.Debug.LogWarning($"ArcLength Negative or Zero! s: {s} | r: {r} | intCS[0]: {intCS[0]} | intCS[1]: {intCS[1]} | phi0: {phi0 * 180 / Math.PI} | phi1: {phi1 * 180 / Math.PI} | A: {A} | d: {d * 180 / Math.PI}");
+                return new ClothoidCurve();
             }
 
             double startCurvature = (d - A) / s;
@@ -188,11 +325,12 @@ namespace Clothoid
             ClothoidCurve c = new ClothoidCurve().AddSegment(new ClothoidSegment((float)startCurvature, (float)sharpness, (float)s));
             if (addOffsets)
             {
-                c.Offset = new UnityEngine.Vector3((float)x0, 0, (float)z0);
-                c.AngleOffset = (float)t0;
+                c.Offset = new UnityEngine.Vector3((float)x1, 0, (float)z1);
+                c.AngleOffset = (float)t1 + 180;
             }
             return c;
         }
+
 
         /// <summary>
         /// Normalize an angle in radians to be between -pi and pi.
@@ -305,40 +443,47 @@ namespace Clothoid
             return new List<double[]>() { X, Y };
         }
 
-        /// <summary>
-        /// Eval XY when a is small and k is 0
-        /// </summary>
-        /// <param name="a"></param>
-        /// <param name="b"></param>
-        /// <param name="k"></param>
-        /// <param name="p"></param>
-        /// <returns></returns>
-        private static double[] EvalXYaSmall(double a, double b, int p)
+        private static List<double[]> EvalXYaSmall2(int k, double a, double b, int p)
         {
-            //Debug.Assert(p > 0 && p < 11);
+            List<double[]> XY = EvalXYaZero(b, k + (4 * p) + 2);
+            double[] X0 = XY[0];
+            double[] Y0 = XY[1];
+            double[] X = new double[3];
+            double[] Y = new double[3];
 
-            List<double[]> points = EvalXYaZero(b, (4 * p) + 2);
-            double[] X0 = points[0];
-            double[] Y0 = points[1];
-
-            double X = X0[0] - (a / 2) * Y0[2];
-            double Y = Y0[0] + (a / 2) * X0[2];
-
-            double t = 1;
-            double aa = -a * a / 4;
-            double bf;
-            int jj;
-
-            for (int i = 1; i <= p; i++)
+            double term1;
+            double term2;
+            double term3;
+            double z, zz, zzz;
+            int n;
+            int nk = 0;
+            do
             {
-                t *= aa / (2 * i * ((2 * i) - 1));
-                bf = a / ((4 * i) + 2);
-                jj = 4 * i;
-                X += t * (X0[jj] - (bf * Y0[jj + 2]));
-                Y += t * (Y0[jj] + (bf * X0[jj + 2]));
-            }
+                X[nk] = 0;
+                Y[nk] = 0;
+                for (n = 0; n <= p; n++)
+                {
+                    z = Math.Pow(a / 2, 2 * n);
+                    zz = Math.Pow(-1, n);
+                    zzz = Mathc.Fact(2 * n);
+                    term1 = z * zz / zzz;
+                    //term1 = Math.Pow(a / 2, 2 * n) * Math.Pow(-1, n) / Mathc.Fact(2 * n);
+                    term2 = X0[(4 * n) + k] - (a * Y0[(4 * n) + k + 2] / (2 * ((2 * n) + 1)));
+                    term3 = Y0[(4 * n) + k] - (a * X0[(4 * n) + k + 2] / (2 * ((2 * n) + 1)));
 
-            return new double[2] { X, Y };
+                    UnityEngine.Debug.LogWarning($"{z} | {zz} | {zzz}");
+
+                    if (!double.IsNormal(term1) || !double.IsNormal(term2) || !double.IsNormal(term3))
+                    {
+                        UnityEngine.Debug.LogWarning($"EvalXYaSmall2 terms not normal: term1: {term1} | term2: {term2} | term3: {term3}");
+                    }
+
+                    X[nk] += term1 * term2;
+                    Y[nk] += term1 * term3;
+                }
+            } while (++nk < k);
+
+            return new List<double[]>() { X, Y };
         }
 
         private static List<double[]> EvalXYaSmall(int k, double a, double b, int p)
@@ -451,10 +596,12 @@ namespace Clothoid
         {
             if (nk > 3 || nk < 0) throw new ArgumentOutOfRangeException();
 
+            if (double.IsNaN(a)) UnityEngine.Debug.LogWarning($"a is NaN: {a}");
+
             double[] X = new double[3];
             double[] Y = new double[3];
 
-            double s = Math.Sign(a);
+            double s = a > 0 ? 1 : -1;
             double absa = Math.Abs(a);
             double z = s * Math.Sqrt(absa / Math.PI);
             double wm = b / Math.Sqrt(Math.PI * absa);
@@ -687,8 +834,16 @@ namespace Clothoid
             double sc = Math.Sin(c);
             List<double[]> CS;
 
-            if (Math.Abs(a) < A_THRESHOLD) CS = EvalXYaSmall(nk, a, b, A_SERIE_SIZE);
-            else CS = EvalXYaLarge2(nk, a, b);
+            if (Math.Abs(a) < A_THRESHOLD)
+            {
+                //UnityEngine.Debug.Log("A < THRESHOLD");
+                CS = EvalXYaSmall2(nk, a, b, A_SMALL_SERIES_SIZE);
+            }
+            else
+            {
+                //UnityEngine.Debug.Log("A >= THRESHOLD");
+                CS = EvalXYaLarge(nk, a, b);
+            }
 
             double xx;
             double yy;
