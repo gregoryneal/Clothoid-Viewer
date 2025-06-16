@@ -74,7 +74,8 @@ namespace Clothoid
         protected Vector3 polylineCM = Vector3.Zero;
 
         /// <summary>
-        /// If the curve position and rotation are approximated, this will be a 
+        /// If the curve position and rotation are approximated, this will be a 3 column row vector that the curve sample point (3 row column vector)
+        /// gets multiplied by  after offsetting the point by the overall curve center of mass.
         /// </summary>
         private double[][] rotationMatrix;
 
