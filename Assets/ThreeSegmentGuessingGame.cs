@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace Clothoid {
@@ -99,7 +98,7 @@ namespace Clothoid {
             //c += new ClothoidSegment(0, 5, .1f, .1f);
             //c += new ClothoidSegment(0, 10, -.1f, -.1f);
             ClothoidCurve c = ClothoidCurve.ThreeSegmentsLocal(startCurvature, sharpness, arcLength1, arcLength2, arcLength3);
-            c.Offset = new Vector3(start.x, 0, start.y);
+            c.Offset = new Vector3(start.x, 0, start.y).ToCSVector3();
             c.AngleOffset = startAngle;
             Helpers.DrawOrderedVector3s(c.GetSamples(c.Count * 50), curveLR);
 
@@ -115,7 +114,7 @@ namespace Clothoid {
         }
 
         Vector3 GetTangent(float angle) {
-            return ClothoidSegment.RotateAboutAxis(new Vector3(1, 0, 0), Vector3.up, -angle);
+            return ClothoidSegment.RotateAboutAxisDeg(new Vector3(1, 0, 0), Vector3.up, -angle);
         }
 
         Vector3 v(Vector2 v) {

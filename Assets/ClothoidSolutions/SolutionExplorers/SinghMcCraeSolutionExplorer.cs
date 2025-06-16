@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Clothoid;
 using UnityEngine;
 
@@ -11,11 +12,10 @@ public class SinghMcCraeSolutionExplorer : MonoBehaviour
     List<Vector3> drawingPoints = new List<Vector3>();
     Vector3 lastSample;
     float sampleArcLength = 1f;
-    ClothoidSolutionSinghMcCrae solution;
+    //ClothoidSolutionSinghMcCrae solution;
 
     void Start()
     {//dsdfsdf
-        solution = new();
         LineRenderer[] lrs = GetComponentsInChildren<LineRenderer>();
         lr1 = lrs[0];
         lr2 = lrs[1];
@@ -63,7 +63,7 @@ public class SinghMcCraeSolutionExplorer : MonoBehaviour
 
     void RedrawCurve()
     {
-        ClothoidCurve c = solution.CalculateClothoidCurve(drawingPoints);
+        ClothoidCurve c = ClothoidSolutionSinghMcCrae.G2(drawingPoints.Select(p => p.ToCSVector3()).ToList());
         Helpers.DrawOrderedVector3s(c.GetSamples(c.Count * 100), this.lr2);
     }
 }

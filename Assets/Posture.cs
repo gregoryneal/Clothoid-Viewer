@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
+using System.Numerics;
 
 namespace Clothoid {
 
@@ -13,30 +13,30 @@ namespace Clothoid {
     /// </summary>
     public class Posture {
         public bool isMirroredX = false;
-        public Vector3 Position => new Vector3(X, 0, Z);
+        public Vector3 Position => new((float)X, 0, (float)Z);
         public Vector3 Tangent { get; private set; }
 
         /// <summary>
         /// The point on the circumference of the circle represented by this posture.
         /// </summary>
-        public float X { get; private set; }
-        public float Z { get; private set; }
+        public double X { get; private set; }
+        public double Z { get; private set; }
 
-        private float _angle = float.NaN;
+        private double _angle = double.NaN;
 
         /// <summary>
-        /// The the tangent angle in degrees of the circle at point (x, z)
+        /// The the tangent angle in radians of the circle at point (x, z)
         /// </summary>
-        public float Angle { get {
-                if (float.IsNaN(_angle)) {
-                    _angle = Mathf.Atan2(Tangent.z, Tangent.x) * 180f / Mathf.PI;
+        public double Angle { get {
+                if (double.IsNaN(_angle)) {
+                    _angle = Math.Atan2(Tangent.Z, Tangent.X);
                     //while (_angle < 0) _angle += 360;
                 }
                 return _angle;
             }
         }
-        public float Curvature { get; private set; }
-        public float Radius { get { return 1 / Curvature; }}
+        public double Curvature { get; private set; }
+        public double Radius { get { return 1 / Curvature; }}
         public Vector3 CircleCenter { get; private set; }
 /*
         public Posture(float x, float z, float angle, float curvature, Vector3 circleCenter) {
@@ -47,7 +47,7 @@ namespace Clothoid {
             this.CircleCenter = circleCenter;
         }
 */
-        public Posture(float x, float z, float curvature, Vector3 tangent, Vector3 circleCenter) {
+        public Posture(double x, double z, double curvature, Vector3 tangent, Vector3 circleCenter) {
             this.X = x;
             this.Z = z;
             this.Curvature = curvature;
@@ -67,18 +67,18 @@ namespace Clothoid {
                 (endAngle, startAngle) = (startAngle, endAngle);
             }
             if (Curvature != 0) {
-                UnityEngine.Vector3 sampleCircle = new UnityEngine.Vector3(MathF.Abs(Radius), 0, 0);
-                List<Vector3> samples = new List<Vector3>();
+                Vector3 sampleCircle = new((float)Math.Abs(Radius), 0, 0);
+                List<Vector3> samples = new();
                 double sampleAngleDeg = (endAngle - startAngle) / numSamples;
                 for (double angleDeg = -startAngle; angleDeg > -endAngle; angleDeg -= sampleAngleDeg) {
-                    samples.Add(ClothoidSegment.RotateAboutAxis(sampleCircle, UnityEngine.Vector3.up, (float)angleDeg) + CircleCenter);
+                    samples.Add(ClothoidSegment.RotateAboutAxisDeg(sampleCircle, Vector3.UnitY, (float)angleDeg) + CircleCenter);
                 }
                 //add last point manually
-                samples.Add(ClothoidSegment.RotateAboutAxis(sampleCircle, Vector3.up, -(float)endAngle) + CircleCenter);
+                samples.Add(ClothoidSegment.RotateAboutAxisDeg(sampleCircle, Vector3.UnitY, -(float)endAngle) + CircleCenter);
                 return samples;
             } else {
                 //CircleCenter is the endpoint if the curvature is 0
-                return new List<UnityEngine.Vector3>() {Position, CircleCenter};
+                return new List<Vector3>() {Position, CircleCenter};
             }
         }
 
@@ -124,17 +124,17 @@ namespace Clothoid {
             float x;
             float z;
             if (I == 1) {
-                x = point1.x;
-                z = point1.z;
+                x = point1.X;
+                z = point1.Z;
             } else if (I == 2) {
-                x = point2.x;
-                z = point2.z;
+                x = point2.X;
+                z = point2.Z;
             } else {
-                x = point3.x;
-                z = point3.z;
+                x = point3.X;
+                z = point3.Z;
             }
 
-            float curvature;
+            double curvature;
             Vector3 tangent;
             Vector3 circleCenter;
             bool areCollinear = Mathc.AreColinearPoints(point1, point2, point3);
@@ -158,15 +158,15 @@ namespace Clothoid {
                 if (Mathc.CenterOfCircleOfThreePoints(out Vector3 center, point1, point2, point3)) {
                     circleCenter = center;
                     //tangent slope is negative reciprocal of normal slope since they are orthogonal.
-                    tangent = new Vector3(z - circleCenter.z, 0, -(x - circleCenter.x));
+                    tangent = new Vector3(z - circleCenter.Z, 0, -(x - circleCenter.X));
                     //Debug.Log($"New Tangent: {tangent}");
                     if (curvature > 0) tangent *= -1;
 
                 } else {
                     //we shouldn't get here so we can use this as debug.
-                    Debug.LogError($"Warning, something is wrong with the center of the circle calculations! Points: ({point1.x}, {point1.z}) | ({point2.x}, {point2.z}) | ({point3.x}, {point3.z})  || Colinear: {areCollinear}");
+                    Console.WriteLine($"Warning, something is wrong with the center of the circle calculations! Points: ({point1.X}, {point1.Z}) | ({point2.X}, {point2.Z}) | ({point3.X}, {point3.Z})  || Colinear: {areCollinear}");
                     circleCenter = point1;
-                    tangent = Vector3.zero;
+                    tangent = Vector3.Zero;
                 }
             }
 
@@ -194,27 +194,22 @@ namespace Clothoid {
             //Debug.Log($"Rotate by {posture1.Angle} degrees");
             //Debug.Log($"Rotate 2 by {posture2.Angle} degrees");
             //rotate relative positions by the start tangent angle
-            Vector3 endPosition = ClothoidSegment.RotateAboutAxis(posture2.Position - posture1.Position, Vector3.up, posture1.Angle);
-            Vector3 circle1 = ClothoidSegment.RotateAboutAxis(posture1.CircleCenter - posture1.Position, Vector3.up, posture1.Angle);
-            Vector3 circle2 = ClothoidSegment.RotateAboutAxis(posture2.CircleCenter - posture1.Position, Vector3.up, posture1.Angle);
-            Vector3 endTangent = ClothoidSegment.RotateAboutAxis(posture2.Tangent, Vector3.up, posture1.Angle);
+            Vector3 endPosition = ClothoidSegment.RotateAboutAxisRad(posture2.Position - posture1.Position, Vector3.UnitY, posture1.Angle);
+            Vector3 circle1 = ClothoidSegment.RotateAboutAxisRad(posture1.CircleCenter - posture1.Position, Vector3.UnitY, posture1.Angle);
+            Vector3 circle2 = ClothoidSegment.RotateAboutAxisRad(posture2.CircleCenter - posture1.Position, Vector3.UnitY, posture1.Angle);
+            Vector3 endTangent = ClothoidSegment.RotateAboutAxisRad(posture2.Tangent, Vector3.UnitY, posture1.Angle);
             
-            newPosture1 = new Posture(0, 0, Math.Abs(posture1.Curvature), Vector3.right * posture1.Tangent.magnitude, circle1);
-            newPosture2 = new Posture(endPosition.x, Math.Abs(endPosition.z), Math.Abs(posture2.Curvature), endTangent, circle2);
+            newPosture1 = new Posture(0, 0, Math.Abs(posture1.Curvature), Vector3.UnitX * posture1.Tangent.Length(), circle1);
+            newPosture2 = new Posture(endPosition.X, Math.Abs(endPosition.Z), Math.Abs(posture2.Curvature), endTangent, circle2);
             
-            if (endPosition.z < 0) {
+            if (endPosition.Z < 0) {
                 //Debug.Log($"IS MIRRORED: {endPosition}");
                 newPosture2.isMirroredX = true;
-                newPosture2.Tangent = new Vector3(newPosture2.Tangent.x, newPosture2.Tangent.y, -newPosture2.Tangent.z);
+                newPosture2.Tangent = new Vector3(newPosture2.Tangent.X, newPosture2.Tangent.Y, -newPosture2.Tangent.Z);
 
-                newPosture1.CircleCenter = new Vector3(newPosture1.CircleCenter.x, newPosture1.CircleCenter.y, -newPosture1.CircleCenter.z);
-                newPosture2.CircleCenter = new Vector3(newPosture2.CircleCenter.x, newPosture2.CircleCenter.y, -newPosture2.CircleCenter.z);
+                newPosture1.CircleCenter = new Vector3(newPosture1.CircleCenter.X, newPosture1.CircleCenter.Y, -newPosture1.CircleCenter.Z);
+                newPosture2.CircleCenter = new Vector3(newPosture2.CircleCenter.X, newPosture2.CircleCenter.Y, -newPosture2.CircleCenter.Z);
             }
-
-            Debug.DrawRay(posture1.Position, posture1.Tangent.normalized * 1, Color.red, 100);
-            Debug.DrawRay(posture2.Position, posture2.Tangent.normalized * 1, Color.red, 10);
-            Debug.DrawRay(newPosture1.Position, newPosture1.Tangent.normalized * 1, Color.green, 10);
-            Debug.DrawRay(newPosture2.Position, newPosture2.Tangent.normalized * 1, Color.green, 10);
 
             return (newPosture1, newPosture2);
         }

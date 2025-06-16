@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq.Expressions;
-using UnityEditor.Rendering;
+//using System.Numerics;
 using UnityEngine;
 
 namespace Clothoid {
@@ -36,10 +35,6 @@ namespace Clothoid {
         /// <returns></returns>
         public abstract ClothoidCurve CalculateClothoidCurve(List<Vector3> inputPolyline, float allowableError = 0.1f, float endpointWeight = 1);
 
-        public virtual List<Vector3> GetFitSamples(int numSamples) {
-            return clothoidCurve.GetSamples(numSamples);
-        }
-        
         /// <summary>
         /// Estimate the arc length of a given node on the polyline.
         /// </summary>

@@ -12,9 +12,9 @@ public class MirrorClothoidSegmentTest : MonoBehaviour
     LineRenderer lr1;
     LineRenderer lr2;
 
-    [Range(-180f, 180f)]
+    [Range(-Mathf.PI, Mathf.PI)]
     public float startAngle = 0;
-    [Range(-180f, 180f)]
+    [Range(-Mathf.PI, Mathf.PI)]
     public float endAngle = 90;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -31,8 +31,8 @@ public class MirrorClothoidSegmentTest : MonoBehaviour
     {
         if (!awake) return;
 
-        ClothoidCurve c = ClothoidSolutionBertolazzi.G1Curve(start.x, start.z, startAngle, end.x, end.z, endAngle, true);
-        ClothoidCurve m = ClothoidSolutionBertolazzi.G1CurveM(start.x, start.z, startAngle, end.x, end.z, endAngle, true);
+        ClothoidCurve c = ClothoidSolutionBertolazzi.G1(start.x, start.z, startAngle, end.x, end.z, endAngle);
+        ClothoidCurve m = ClothoidSolutionBertolazzi.G1CurveM(start.x, start.z, startAngle, end.x, end.z, endAngle);
         Helpers.DrawOrderedVector3s(c.GetSamples(100), lr1, 0, .1f);
         Helpers.DrawOrderedVector3s(m.GetSamples(100), lr2);
     }

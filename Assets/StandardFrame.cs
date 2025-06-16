@@ -24,7 +24,7 @@ namespace Clothoid
         }
 
         private static Vector3 Rotate(Vector3 point, float angle) {
-            return ClothoidSegment.RotateAboutAxis(point, Vector3.UnitY, angle);
+            return ClothoidSegment.RotateAboutAxisDeg(point, Vector3.UnitY, angle);
         }
     }
 }

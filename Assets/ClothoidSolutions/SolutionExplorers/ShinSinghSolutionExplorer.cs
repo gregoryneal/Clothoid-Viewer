@@ -36,10 +36,10 @@ namespace Clothoid {
         void SetupVisuals() {
             //Draw start and end point, label curvature and tangent
             startGO.transform.position = start;
-            Helpers.DrawOrderedVector3s(new List<Vector3>(){start, start + (Helpers.GetTangent(0) * 3)}, this.startLR);
+            Helpers.DrawOrderedVector3s(new List<Vector3>(){start, start + (Helpers.GetTangent(0) * 3).ToUnityVector3()}, this.startLR);
 
             endGO.transform.position = new Vector3(end.x, 0, end.z);
-            Helpers.DrawOrderedVector3s(new List<Vector3>(){end, end + (Helpers.GetTangent(endAngle) * 3)}, this.endLR);
+            Helpers.DrawOrderedVector3s(new List<Vector3>(){end, end + (Helpers.GetTangentDeg(endAngle) * 3).ToUnityVector3()}, this.endLR);
         }
 
         void OnValidate() {
@@ -53,7 +53,7 @@ namespace Clothoid {
             if (nextCurve.MoveNext()) {
                 ClothoidCurve c = nextCurve.Current;
                 //Debug.Log(c.ToString());
-                List<Vector3> samples = c.GetSamples(100 * c.Count);
+                List<System.Numerics.Vector3> samples = c.GetSamples(100 * c.Count);
                 //Debug.Log(samples.Count);
                 //segmentedLKLR.startWidth = .1f;
                 //segmentedLKLR.endWidth = .1f;

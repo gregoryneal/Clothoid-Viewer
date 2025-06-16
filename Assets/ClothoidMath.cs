@@ -1,38 +1,274 @@
 using System;
 using System.Collections.Generic;
-
-//using System.Numerics;
-using UnityEngine;
+using System.Numerics;
 
 namespace Clothoid {
-    
-    public class Helpers {
-        public static void DrawOrderedVector3s(List<Vector3> positions, LineRenderer lr, float zOffset = 0, float yOffset = 0) {            
-                float sumOfLength = 0;
-                List<Vector3> newPositions = new List<Vector3>();
-                for (int i = 0; i < positions.Count; i++) {
-                    Vector3 p = positions[i] + (Vector3.forward * zOffset) + (Vector3.up * yOffset);
-                    if (zOffset != 0 || yOffset != 0) newPositions.Add(p);
-                    if (i < positions.Count-1) sumOfLength += Vector3.Distance(positions[i], positions[i+1]);
-                }
-                if (zOffset != 0 || yOffset != 0) positions = newPositions;
-                lr.positionCount = positions.Count;
-                lr.SetPositions(positions.ToArray());
+
+    public class Helpers
+    {
+        /// <summary>
+        /// Draw a sequence of System.Numerics.Vector3 on a UnityEngine.LineRenderer
+        /// </summary>
+        /// <param name="positions"></param>
+        /// <param name="lr"></param>
+        /// <param name="zOffset"></param>
+        /// <param name="yOffset"></param>
+        public static void DrawOrderedVector3s(List<Vector3> positions, UnityEngine.LineRenderer lr, float zOffset = 0, float yOffset = 0)
+        {
+            List<UnityEngine.Vector3> p = new();
+            for (int i = 0; i < positions.Count; i++)
+            {
+                UnityEngine.Vector3 v = positions[i].ToUnityVector3();
+                p.Add(positions[i].ToUnityVector3());
+            }
+            DrawOrderedVector3s(p, lr, zOffset, yOffset);
         }
 
         /// <summary>
-        /// Get the tangent vector from an angle in degrees.
+        /// Draw a sequence of UnityEngine.Vector3 on a UnityEngine.LineRenderer
         /// </summary>
-        /// <param name="angle"></param>
-        /// <returns></returns>
-        public static Vector3 GetTangent(float angle)
+        /// <param name="positions"></param>
+        /// <param name="lr"></param>
+        /// <param name="zOffset"></param>
+        /// <param name="yOffset"></param>
+        public static void DrawOrderedVector3s(List<UnityEngine.Vector3> positions, UnityEngine.LineRenderer lr, float zOffset = 0, float yOffset = 0)
         {
-            return ClothoidSegment.RotateAboutAxis(new Vector3(1, 0, 0), Vector3.up, -angle);
+            float sumOfLength = 0;
+            List<UnityEngine.Vector3> newPositions = new();
+            for (int i = 0; i < positions.Count; i++)
+            {
+                Vector3 pi = positions[i].ToCSVector3();
+                Vector3 p = pi + (Vector3.UnitZ * zOffset) + (Vector3.UnitY * yOffset);
+                if (zOffset != 0 || yOffset != 0) newPositions.Add(p.ToUnityVector3());
+                if (i < positions.Count - 1) sumOfLength += Vector3.Distance(pi, positions[i + 1].ToCSVector3());
+            }
+            if (zOffset != 0 || yOffset != 0) positions = newPositions;
+            lr.positionCount = positions.Count;
+            lr.SetPositions(positions.ToArray());
+        }
+
+        /// <summary>
+        /// Get the tangent vector from an angle in radians.
+        /// </summary>
+        /// <param name="radians"></param>
+        /// <returns></returns>
+        public static Vector3 GetTangent(double radians)
+        {
+            //it is negative because a "positive" angle should rotate in a counterclockwise direction
+            return ClothoidSegment.RotateAboutAxisRad(new Vector3(1, 0, 0), Vector3.UnitY, -radians);
+        }
+
+        public static Vector3 GetTangentDeg(double degrees)
+        {
+            return GetTangent(degrees * Math.PI / 180);
         }
     }
 
     public static class Mathc
     {
+        static readonly double[] fn = new double[11] {
+            0.49999988085884732562,
+            1.3511177791210715095,
+            1.3175407836168659241,
+            1.1861149300293854992,
+            0.7709627298888346769,
+            0.4173874338787963957,
+            0.19044202705272903923,
+            0.06655998896627697537,
+            0.022789258616785717418,
+            0.0040116689358507943804,
+            0.0012192036851249883877
+        };
+        static readonly double[] fd = new double[12] {
+            1.0,
+            2.7022305772400260215,
+            4.2059268151438492767,
+            4.5221882840107715516,
+            3.7240352281630359588,
+            2.4589286254678152943,
+            1.3125491629443702962,
+            0.5997685720120932908,
+            0.20907680750378849485,
+            0.07159621634657901433,
+            0.012602969513793714191,
+            0.0038302423512931250065
+        };
+        static readonly double[] gn = new double[11] {
+            0.50000014392706344801,
+            0.032346434925349128728,
+            0.17619325157863254363,
+            0.038606273170706486252,
+            0.023693692309257725361,
+            0.007092018516845033662,
+            0.0012492123212412087428,
+            0.00044023040894778468486,
+            -8.80266827476172521e-6,
+            -1.4033554916580018648e-8,
+            2.3509221782155474353e-10
+        };
+        static readonly double[] gd = new double[12]{
+            1.0,
+            2.0646987497019598937,
+            2.9109311766948031235,
+            2.6561936751333032911,
+            2.0195563983177268073,
+            1.1167891129189363902,
+            0.57267874755973172715,
+            0.19408481169593070798,
+            0.07634808341431248904,
+            0.011573247407207865977,
+            0.0044099273693067311209,
+            -0.00009070958410429993314
+        };
+
+        /// <summary>
+        /// Compute the Fresnel integral using a method defined by Venkata Sivakanth Telasula ~2005.
+        /// </summary>
+        /// <param name="arcLength"></param>
+        /// <param name="C"></param>
+        /// <param name="S"></param>
+        /// <exception cref="Exception"></exception>
+        public static void FresnelCS(double arcLength, out double C, out double S)
+        {
+            double x = Math.Abs(arcLength);
+            double EPS = 1E-15;
+            double PI_2 = Math.PI / 2;
+
+            if (x < 1.0)
+            {
+                double term, sum;
+                double s = PI_2 * (x * x);
+                double t = -s * s;
+
+                // Cosine integral series
+                double twofn = 0.0;
+                double fact = 1.0;
+                double denterm = 1.0;
+                double numterm = 1.0;
+                sum = 1.0;
+                do
+                {
+                    twofn += 2.0;
+                    fact *= twofn * (twofn - 1.0);
+                    denterm += 4.0;
+                    numterm *= t;
+                    term = numterm / (fact * denterm);
+                    sum += term;
+                } while (Math.Abs(term) > EPS * Math.Abs(sum));
+
+                C = x * sum;
+
+                // Sine integral series
+                twofn = 1.0;
+                fact = 1.0;
+                denterm = 3.0;
+                numterm = 1.0;
+                sum = 1.0 / 3.0;
+                do
+                {
+                    twofn += 2.0;
+                    fact *= twofn * (twofn - 1.0);
+                    denterm += 4.0;
+                    numterm *= t;
+                    term = numterm / (fact * denterm);
+                    sum += term;
+                } while (Math.Abs(term) > EPS * Math.Abs(sum));
+
+                S = PI_2 * sum * (x * x * x);
+            }
+            else if (x < 6.0)
+            {
+                // Rational approximation for f
+                double sumn = 0.0;
+                double sumd = fd[11];
+                for (int k = 10; k >= 0; --k)
+                {
+                    sumn = fn[k] + x * sumn;
+                    sumd = fd[k] + x * sumd;
+                }
+                double f = sumn / sumd;
+
+                // Rational approximation for g
+                sumn = 0.0;
+                sumd = gd[11];
+                for (int k = 10; k >= 0; --k)
+                {
+                    sumn = gn[k] + x * sumn;
+                    sumd = gd[k] + x * sumd;
+                }
+                double g = sumn / sumd;
+
+                double U = PI_2 * (x * x);
+                double SinU = Math.Sin(U);
+                double CosU = Math.Cos(U);
+
+                C = 0.5 + f * SinU - g * CosU;
+                S = 0.5 - f * CosU - g * SinU;
+            }
+            else
+            {
+                // x >= 6.0; asymptotic expansions for f and g
+                double s = Math.PI * x * x;
+                double t = -1 / (s * s);
+
+                // Expansion for f
+                double numterm = -1.0;
+                double term = 1.0;
+                double sum = 1.0;
+                double oldterm = 1.0;
+                double eps10 = 0.1 * EPS;
+                double absterm;
+
+                do
+                {
+                    numterm += 4.0;
+                    term *= numterm * (numterm - 2.0) * t;
+                    sum += term;
+                    absterm = Math.Abs(term);
+                    if (oldterm < absterm)
+                    {
+                        throw new Exception($"In FresnelCS f not converged to eps, x = {x}, oldterm = {oldterm}, absterm = {absterm}");
+                    }
+                    oldterm = absterm;
+                } while (absterm > eps10 * Math.Abs(sum));
+
+                double f = sum / (Math.PI * x);
+
+                // Expansion for g
+                numterm = -1.0;
+                term = 1.0;
+                sum = 1.0;
+                oldterm = 1.0;
+
+                do
+                {
+                    numterm += 4.0;
+                    term *= numterm * (numterm + 2.0) * t;
+                    sum += term;
+                    absterm = Math.Abs(term);
+                    if (oldterm < absterm)
+                    {
+                        throw new Exception($"In FresnelCS g not converged to eps, x = {x}, oldterm = {oldterm}, absterm = {absterm}");
+                    }
+                    oldterm = absterm;
+                } while (absterm > eps10 * Math.Abs(sum));
+
+                double g = sum / ((Math.PI * x) * (Math.PI * x * x));
+
+                double U = PI_2 * (x * x);
+                double SinU = Math.Sin(U);
+                double CosU = Math.Cos(U);
+
+                C = 0.5 + f * SinU - g * CosU;
+                S = 0.5 - f * CosU - g * SinU;
+            }
+
+            if (arcLength < 0)
+            {
+                C = -C;
+                S = -S;
+            }
+        }
 
         /// <summary>
         /// This is the Fresnel Cosine Integral approximation, as given by:
@@ -43,7 +279,7 @@ namespace Clothoid {
         /// </summary>
         /// <param name="arcLength"></param>
         /// <returns></returns>
-        public static float C(float arcLength)
+        /*public static float C(float arcLength)
         {
             arcLength /= ClothoidSegment.CURVE_FACTOR;
             int scalar = 1;
@@ -54,6 +290,19 @@ namespace Clothoid {
             }
             float val = .5f - (R(arcLength) * (float)System.Math.Sin(System.Math.PI * 0.5f * (A(arcLength) - (arcLength * arcLength))));
             return scalar * val * ClothoidSegment.CURVE_FACTOR;
+        }*/
+
+        public static double C(double arcLength)
+        {
+            arcLength /= ClothoidSegment.CURVE_FACTOR;
+            int scalar = 1;
+            if (arcLength < 0)
+            {
+                scalar = -1;
+                arcLength *= -1;
+            }
+            double val = .5f - (R(arcLength) * System.Math.Sin(System.Math.PI * 0.5f * (A(arcLength) - (arcLength * arcLength))));
+            return scalar * val * ClothoidSegment.CURVE_FACTOR;
         }
 
         /// <summary>
@@ -61,7 +310,7 @@ namespace Clothoid {
         /// </summary>
         /// <param name="arcLength"></param>
         /// <returns></returns>
-        public static float S(float arcLength)
+        /*public static float S(float arcLength)
         {
             arcLength /= ClothoidSegment.CURVE_FACTOR;
             int scalar = 1;
@@ -71,6 +320,19 @@ namespace Clothoid {
                 arcLength *= -1;
             }
             float val = 0.5f - (R(arcLength) * (float)System.Math.Cos(System.Math.PI * 0.5f * (A(arcLength) - (arcLength * arcLength))));
+            return scalar * val * ClothoidSegment.CURVE_FACTOR;
+        }*/
+
+        public static double S(double arcLength)
+        {
+            arcLength /= ClothoidSegment.CURVE_FACTOR;
+            int scalar = 1;
+            if (arcLength < 0)
+            {
+                scalar = -1;
+                arcLength *= -1;
+            }
+            double val = 0.5f - (R(arcLength) * (float)System.Math.Cos(System.Math.PI * 0.5f * (A(arcLength) - (arcLength * arcLength))));
             return scalar * val * ClothoidSegment.CURVE_FACTOR;
         }
 
@@ -85,12 +347,23 @@ namespace Clothoid {
             float denom = (1.79f * t * t) + (2.054f * t) + (float)System.Math.Sqrt(2);
             return num / denom;
         }
+        private static double R(double t)
+        {
+            double num = (.506 * t) + 1;
+            double denom = (1.79 * t * t) + (2.054 * t) + (float)System.Math.Sqrt(2);
+            return num / denom;
+        }
 
         /// <summary>
         /// Helper function used by the Fresnel Integral approximations.
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
+        private static double A(double t)
+        {
+            return 1 / ((.803 * t * t * t) + (1.886 * t * t) + (2.524 * t) + 2);
+        }
+
         private static float A(float t)
         {
             return 1f / ((.803f * t * t * t) + (1.886f * t * t) + (2.524f * t) + 2);
@@ -111,7 +384,7 @@ namespace Clothoid {
             float b = Vector3.Distance(point2, point3);
             float c = Vector3.Distance(point1, point3);
             float s = (a + b + c) / 2; //half perimeter
-            float area = Mathf.Sqrt(s * (s - a) * (s - b) * (s - c)); //herons forumula
+            float area = (float)Math.Sqrt(s * (s - a) * (s - b) * (s - c)); //herons forumula
             if (area == 0) return 0; //collinear points
             float numerator = 4 * area;
             float denominator = a * b * c;
@@ -128,7 +401,7 @@ namespace Clothoid {
         /// <param name="point2"></param>
         /// <param name="point3"></param>
         /// <returns></returns>
-        public static float MoretonSequinCurvature(Vector3 point1, Vector3 point2, Vector3 point3)
+        public static float MoretonSequinCurvature(UnityEngine.Vector3 point1, UnityEngine.Vector3 point2, UnityEngine.Vector3 point3)
         {
             return (float)MoretonSequinCurvature(point1.ToCSVector3(), point2.ToCSVector3(), point3.ToCSVector3());
             /*
@@ -153,29 +426,15 @@ namespace Clothoid {
         /// <param name="point2"></param>
         /// <param name="point3"></param>
         /// <returns></returns>
-        public static float FrenetSerretCurvature(Vector3 point1, Vector3 point2, Vector3 point3)
+        public static double FrenetSerretCurvature(Vector3 point1, Vector3 point2, Vector3 point3)
         {
             Vector3 v1 = point2 - point1;
             Vector3 v2 = point3 - point2;
-            float mag1 = v1.magnitude;
-            float mag2 = v2.magnitude;
+            float mag1 = v1.Length();
+            float mag2 = v2.Length();
             if (mag1 == 0 || mag2 == 0) return 0;
-            float theta = Mathf.Acos(Vector3.Dot(v1.normalized, v2.normalized));
-            return 2 * Mathf.Sin(theta / 2) / Mathf.Sqrt(mag1 * mag2);
-        }
-
-        /// <summary>
-        /// Some curvature calculation that I found on arxiv in the middle of the night, it doesn't work.
-        /// </summary>
-        /// <param name="point1"></param>
-        /// <param name="point2"></param>
-        /// <param name="point3"></param>
-        /// <returns></returns>
-        public static float RandomArxivCurvature(Vector3 point1, Vector3 point2, Vector3 point3)
-        {
-            Vector3 v1 = point2 - point1;
-            Vector3 v2 = point3 - point2;
-            return Mathf.PI - (Vector3.Angle(v1, v2) * Mathf.PI / 180f);
+            double theta = Math.Acos(Vector3.Dot(Vector3.Normalize(v1), Vector3.Normalize(v2)));
+            return 2 * Math.Sin(theta / 2) / Math.Sqrt(mag1 * mag2);
         }
 
         /// <summary>
@@ -210,15 +469,15 @@ namespace Clothoid {
         /// <returns></returns>
         public static bool AreColinearPoints(Vector3 point1, Vector3 point2, Vector3 point3, float minError = 0.01f)
         {
-            float dx1 = point2.x - point1.x;
-            float dx2 = point3.x - point2.x;
+            float dx1 = point2.X - point1.X;
+            float dx2 = point3.X - point2.X;
 
             //Infinite slope1 and maybe infinite slope 2
             if (dx1 == 0) return dx2 == 0;
             //Infinite slope2 but finite slope1
             else if (dx2 == 0) return false;
             //Slope1 and slope2 are finite
-            else return Mathf.Abs(((point2.z - point1.z) / dx1) - ((point3.z - point2.z) / dx2)) < minError;
+            else return Math.Abs(((point2.Z - point1.Z) / dx1) - ((point3.Z - point2.Z) / dx2)) < minError;
         }
 
         /// <summary>
@@ -263,8 +522,8 @@ namespace Clothoid {
         /// <returns></returns>
         public static bool LineLineIntersection(out Vector3 intersection, Vector3 point1, float slope1, Vector3 point2, float slope2)
         {
-            intersection = Vector3.zero;
-            if (Mathf.Abs(slope1) == Mathf.Abs(slope2)) return false;
+            intersection = Vector3.Zero;
+            if (Math.Abs(slope1) == Math.Abs(slope2)) return false;
 
             float int1 = InterceptFromPointAndSlope(point1, slope1);
             float int2 = InterceptFromPointAndSlope(point2, slope2); //y = mx + b => m1x + b1 = m2x + b2 at intersection so x = (b2 - b1) / (m1 - m2)
@@ -276,31 +535,31 @@ namespace Clothoid {
             if (!float.IsFinite(slope1))
             {
                 //slope2 is not infinity, we need the intersection of line two with a vertical line instead
-                xValue = point1.x;
+                xValue = point1.X;
                 yValue = (slope2 * xValue) + int2;
             }
             else if (!float.IsFinite(slope2))
             {
-                xValue = point2.x;
+                xValue = point2.X;
                 yValue = (slope1 * xValue) + int1;
             }
             else if (slope1 == 0 && slope2 != 0)
             {
                 //if a slope is 0 we need to check for intersection between horizontal line and line with slope
-                yValue = point1.z;
+                yValue = point1.Z;
                 xValue = (yValue - int2) / slope2;
             }
             else if (slope2 == 0 && slope1 != 0)
             {
-                yValue = point2.z;
+                yValue = point2.Z;
                 xValue = (yValue - int1) / slope1;
             }
             else if (slope1 == 0 && slope2 == 0)
             {
                 if (int1 == int2)
                 {
-                    xValue = point1.x;
-                    yValue = point1.z;
+                    xValue = point1.X;
+                    yValue = point1.Z;
                 }
                 else
                 {
@@ -327,19 +586,19 @@ namespace Clothoid {
         public static bool LineCircleIntersection(out List<Vector3> intersections, Vector3 point, float slope, float circleRadius, Vector3 circleCenter)
         {
             intersections = new List<Vector3>();
-            float zIntercept = InterceptFromPointAndSlope(point, slope);
-            float discriminant;
-            float a;
-            float b;
-            float c;
-            float x;
-            float y;
-            if (!float.IsFinite(slope))
+            double zIntercept = InterceptFromPointAndSlope(point, slope);
+            double discriminant;
+            double a;
+            double b;
+            double c;
+            double x;
+            double y;
+            if (!double.IsFinite(slope))
             {
                 //handle case where line is vertical line x = k
                 a = 1;
-                b = -2 * circleCenter.z;
-                c = (circleCenter.x * circleCenter.x) + (circleCenter.z * circleCenter.z) - (circleRadius * circleRadius) - (2 * zIntercept * circleCenter.x) + (zIntercept * zIntercept);
+                b = -2 * circleCenter.Z;
+                c = (circleCenter.X * circleCenter.X) + (circleCenter.Z * circleCenter.Z) - (circleRadius * circleRadius) - (2 * zIntercept * circleCenter.X) + (zIntercept * zIntercept);
 
                 discriminant = (b * b) - (4 * a * c);
 
@@ -349,16 +608,16 @@ namespace Clothoid {
                 }
                 else if (discriminant > 0)
                 {
-                    y = (-b + Mathf.Sqrt(discriminant)) / (2 * a);
-                    intersections.Add(new Vector3(zIntercept, 0, y));
-                    y = (-b - Mathf.Sqrt(discriminant)) / (2 * a);
-                    intersections.Add(new Vector3(zIntercept, 0, y));
+                    y = (-b + Math.Sqrt(discriminant)) / (2 * a);
+                    intersections.Add(new Vector3((float)zIntercept, 0, (float)y));
+                    y = (-b - Math.Sqrt(discriminant)) / (2 * a);
+                    intersections.Add(new Vector3((float)zIntercept, 0, (float)y));
                     return true;
                 }
                 else
                 {
                     y = -b / (2 * a);
-                    intersections.Add(new Vector3(zIntercept, 0, y));
+                    intersections.Add(new Vector3((float)zIntercept, 0, (float)y));
                     return true;
                 }
 
@@ -366,8 +625,8 @@ namespace Clothoid {
             else
             {
                 a = (slope * slope) + 1;
-                b = 2 * ((slope * zIntercept) - (slope * circleCenter.z) - circleCenter.x);
-                c = (circleCenter.z * circleCenter.z) - (circleRadius * circleRadius) + (circleCenter.x * circleCenter.x) - (2 * zIntercept * circleCenter.z) + (zIntercept * zIntercept);
+                b = 2 * ((slope * zIntercept) - (slope * circleCenter.Z) - circleCenter.X);
+                c = (circleCenter.Z * circleCenter.Z) - (circleRadius * circleRadius) + (circleCenter.X * circleCenter.X) - (2 * zIntercept * circleCenter.Z) + (zIntercept * zIntercept);
 
                 discriminant = (b * b) - (4 * a * c);
 
@@ -379,17 +638,17 @@ namespace Clothoid {
                 else if (discriminant > 0)
                 {
                     //2 solutions
-                    x = (-b + Mathf.Sqrt(discriminant)) / (2 * a);
-                    intersections.Add(new Vector3(x, 0, (slope * x) + zIntercept));
-                    x = (-b - Mathf.Sqrt(discriminant)) / (2 * a);
-                    intersections.Add(new Vector3(x, 0, (slope * x) + zIntercept));
+                    x = (-b + Math.Sqrt(discriminant)) / (2 * a);
+                    intersections.Add(new Vector3((float)x, 0, (float)((slope * x) + zIntercept)));
+                    x = (-b - Math.Sqrt(discriminant)) / (2 * a);
+                    intersections.Add(new Vector3((float)x, 0, (float)((slope * x) + zIntercept)));
                     return true;
                 }
                 else
                 {
                     //1 solution
                     x = -b / (2 * a);
-                    intersections.Add(new Vector3(x, 0, (slope * x) + zIntercept));
+                    intersections.Add(new Vector3((float)x, 0, (float)((slope * x) + zIntercept)));
                     return true;
                 }
             }
@@ -404,8 +663,8 @@ namespace Clothoid {
         /// <returns></returns>
         public static (float, float) EquationOfLineFromTwoPoints(Vector3 point1, Vector3 point2)
         {
-            float diffZ = point2.z - point1.z;
-            float diffX = point2.x - point1.x;
+            float diffZ = point2.Z - point1.Z;
+            float diffX = point2.X - point1.X;
             float slope;
 
             if (diffX == 0)
@@ -429,16 +688,16 @@ namespace Clothoid {
         /// <returns></returns>
         public static float InterceptFromPointAndSlope(Vector3 point, float slope)
         {
-            if (!float.IsFinite(slope)) return point.x;
-            return point.z - (slope * point.x); // b = y - mx
+            if (!float.IsFinite(slope)) return point.X;
+            return point.Z - (slope * point.X); // b = y - mx
         }
 
-        public static Vector3 ToUnityVector3(this System.Numerics.Vector3 vector)
+        public static UnityEngine.Vector3 ToUnityVector3(this System.Numerics.Vector3 vector)
         {
-            return new Vector3(vector.X, vector.Y, vector.Z);
+            return new UnityEngine.Vector3(vector.X, vector.Y, vector.Z);
         }
 
-        public static System.Numerics.Vector3 ToCSVector3(this Vector3 vector)
+        public static System.Numerics.Vector3 ToCSVector3(this UnityEngine.Vector3 vector)
         {
             return new System.Numerics.Vector3(vector.x, vector.y, vector.z);
         }
@@ -447,7 +706,7 @@ namespace Clothoid {
         {
             public static void Test()
             {
-                Debug.Log("\nBegin SVD decomp via Jacobi algorithm using C#");
+                //Console.WriteLine("\nBegin SVD decomp via Jacobi algorithm using C#");
 
                 double[][] A = new double[4][];
                 A[0] = new double[] { 1, 2, 3 };
@@ -455,30 +714,30 @@ namespace Clothoid {
                 A[2] = new double[] { 8, 5, 4 };
                 A[3] = new double[] { 6, 9, 7 };
 
-                Debug.Log("\nSource matrix: ");
+                //Console.WriteLine("\nSource matrix: ");
                 MatShow(A, 1, 5);
 
                 double[][] U;
                 double[][] Vh;
                 double[] s;
 
-                Debug.Log("\nPerforming SVD decomposition ");
+                //Console.WriteLine("\nPerforming SVD decomposition ");
                 SVD_Jacobi(A, out U, out Vh, out s);
 
-                Debug.Log("\nResult U = ");
+                //Console.WriteLine("\nResult U = ");
                 MatShow(U, 4, 9);
-                Debug.Log("\nResult s = ");
+                //Console.WriteLine("\nResult s = ");
                 VecShow(s, 4, 9);
-                Debug.Log("\nResult Vh = ");
+                //Console.WriteLine("\nResult Vh = ");
                 MatShow(Vh, 4, 9);
 
                 double[][] S = MatDiag(s);
                 double[][] US = MatProduct(U, S);
                 double[][] USVh = MatProduct(US, Vh);
-                Debug.Log("\nU * S * Vh = ");
+                //Console.WriteLine("\nU * S * Vh = ");
                 MatShow(USVh, 4, 9);
 
-                Debug.Log("\nEnd demo ");
+                //Console.WriteLine("\nEnd demo ");
                 Console.ReadLine();
             } // Main
 
@@ -638,7 +897,7 @@ namespace Clothoid {
 
                 if (count > 0)
                 {
-                    Debug.Log("Jacobi iterations did not converge");
+                    //Console.WriteLine("Jacobi iterations did not converge");
                     return false;
                 }
 
@@ -655,7 +914,7 @@ namespace Clothoid {
             //
             // ======================================================
 
-            static double[][] MatMake(int r, int c)
+            public static double[][] MatMake(int r, int c)
             {
                 double[][] result = new double[r][];
                 for (int i = 0; i < r; ++i)
@@ -742,7 +1001,11 @@ namespace Clothoid {
                 int bRows = matB.Length;
                 int bCols = matB[0].Length;
                 if (aCols != bRows)
+                {
+                    MatShow(matA);
+                    MatShow(matB);
                     throw new Exception("Non-conformable matrices");
+                }
 
                 double[][] result = MatMake(aRows, bCols);
 
@@ -805,7 +1068,7 @@ namespace Clothoid {
 
             // ------------------------------------------------------
 
-            public static void MatShow(double[][] m, int dec, int wid)
+            public static void MatShow(double[][] m, int decimalPlaces = 4, int padWidth = 9)
             {
                 for (int i = 0; i < m.Length; ++i)
                 {
@@ -814,9 +1077,9 @@ namespace Clothoid {
                     {
                         double v = m[i][j];
                         if (System.Math.Abs(v) < 1.0e-8) v = 0.0;    // hack
-                        rowString += v.ToString("F" + dec).PadLeft(wid);
+                        rowString += v.ToString("F" + decimalPlaces).PadLeft(padWidth);
                     }
-                    Debug.Log(rowString);
+                    //Console.WriteLine(rowString);
                 }
             }
 
@@ -831,7 +1094,7 @@ namespace Clothoid {
                     if (System.Math.Abs(x) < 1.0e-8) x = 0.0;
                     rowString += x.ToString("F" + dec).PadLeft(wid);
                 }
-                Debug.Log(rowString);
+                //Console.WriteLine(rowString);
             }
         }
 
@@ -875,7 +1138,7 @@ namespace Clothoid {
             }
             return r;
         }
-        
+
         /// <summary>
         /// Factorial an integer
         /// </summary>
@@ -887,6 +1150,22 @@ namespace Clothoid {
                 return 1;
             else
                 return f * Fact(f - 1);
+        }
+
+        /// <summary>
+        /// Calculate the cross product of two Vector2s.
+        /// </summary>
+        /// <param name="rhs"></param>
+        /// <param name="lhs"></param>
+        /// <returns></returns>
+        public static double Cross(UnityEngine.Vector2 lhs, UnityEngine.Vector2 rhs)
+        {
+            return (lhs.x * rhs.y) - (lhs.y * rhs.x);
+        }
+
+        public static double Cross(System.Numerics.Vector2 lhs, System.Numerics.Vector2 rhs)
+        {
+            return (lhs.X * rhs.Y) - (lhs.Y * rhs.X);
         }
     }
 }

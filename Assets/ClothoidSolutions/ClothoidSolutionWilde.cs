@@ -13,7 +13,6 @@ namespace Clothoid {
         public override ClothoidCurve CalculateClothoidCurve(List<Vector3> inputPolyline, float allowableError = 0.1F, float endpointWeight = 1)
         {
             SetPolyline(polyline);
-            if (polyline.Count >= 3) this.postures = Posture.CalculatePostures(polyline);
             throw new System.NotImplementedException();
         }
         private void CalculateSegments() {

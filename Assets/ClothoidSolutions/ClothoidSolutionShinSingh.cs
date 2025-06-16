@@ -1,7 +1,7 @@
 using System;
+using System.Numerics;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
 
 namespace Clothoid {
 
@@ -166,17 +166,19 @@ namespace Clothoid {
             double k3f;
 
             //guess curve
-            ClothoidCurve curve = new ClothoidCurve();
-            curve.Offset = Postures[0].Position;
-            curve.AngleOffset = Postures[0].Angle;
-            ClothoidCurve testCurve = new ClothoidCurve();
+            ClothoidCurve curve = new()
+            {
+                Offset = Postures[0].Position,
+                AngleOffset = Postures[0].Angle
+            };
+            ClothoidCurve testCurve = new();
 
             //final position guess
-            UnityEngine.Vector3 guess;
+            Vector3 guess;
             //double guessx;
             //double guessz;
             //temp variable to find min distance from guess to goal
-            float minDist = Mathf.Infinity;
+            float minDist = float.PositiveInfinity;
             float goalDist = 0.01f;
 
             for (int i = 0; i+1 < Postures.Count; i++) {
@@ -189,11 +191,11 @@ namespace Clothoid {
                 //first l1 and l2 guess, 1/3 of the average of the two small circular arcs connecting them.
                 // Guess the initial total arc lengths of the first and second clothoid segments
                 //radians                
-                thetao = Mathf.Atan2(posture1.Position.z - posture1.CircleCenter.z, posture1.Position.x - posture1.CircleCenter.x) * 180 / Mathf.PI;
-                thetaf = Mathf.Atan2(posture2.Position.z - posture1.CircleCenter.z, posture2.Position.x - posture1.CircleCenter.x) * 180 / Mathf.PI;
+                thetao = Math.Atan2(posture1.Position.Z - posture1.CircleCenter.Z, posture1.Position.X - posture1.CircleCenter.X) * 180 / Math.PI;
+                thetaf = Math.Atan2(posture2.Position.Z - posture1.CircleCenter.Z, posture2.Position.X - posture1.CircleCenter.X) * 180 / Math.PI;
                 s11 = posture1.GetArcLength(thetaf-thetao);
-                thetao = Mathf.Atan2(posture1.Position.z - posture2.CircleCenter.z, posture1.Position.x - posture2.CircleCenter.x) * 180 / Mathf.PI;
-                thetaf = Mathf.Atan2(posture2.Position.z - posture2.CircleCenter.z, posture2.Position.x - posture2.CircleCenter.x) * 180 / Mathf.PI;
+                thetao = Math.Atan2(posture1.Position.Z - posture2.CircleCenter.Z, posture1.Position.X - posture2.CircleCenter.X) * 180 / Math.PI;
+                thetaf = Math.Atan2(posture2.Position.Z - posture2.CircleCenter.Z, posture2.Position.X - posture2.CircleCenter.X) * 180 / Math.PI;
                 s22 = posture2.GetArcLength(thetaf-thetao);
                 s1 = s2 = (s11 + s22) / 6; //first clothoid
 
@@ -219,7 +221,7 @@ namespace Clothoid {
                 //v3 = posture1.Position - posture2.CircleCenter;
                 //v4 = posture2.Position - posture2.CircleCenter;     
 
-                Debug.Log($"New Curvatures: {ki} to {kf}");
+                Console.WriteLine($"New Curvatures: {ki} to {kf}");
 
                 if (ki == kf) {
                     //the sharpness is 0, we have either a line segment or a circle segment
@@ -272,15 +274,15 @@ namespace Clothoid {
 
                         // Pick the value which matches the sign of sign
                         if (sign == 1) {
-                            Debug.Log("Sign > 0");
+                            Console.WriteLine("Sign > 0");
                             if (xplus > 0) x = xplus;
                             else x = xminus;
                         } else if (sign == -1) {
-                            Debug.Log("Sign < 0");
+                            Console.WriteLine("Sign < 0");
                             if (xplus < 0) x = xplus;
                             else x = xminus;
                         } else {
-                            Debug.Log("Sign == 0");
+                            Console.WriteLine("Sign == 0");
                             x = 0;
                         }
 
@@ -311,7 +313,7 @@ namespace Clothoid {
                         
 
                         
-                        Debug.Log($"Varying s1: Yielding new curve with parameters: sign: {sign}, s1: {tempS1}, s2: {s2}, s3: {s3}, ki: {ki}, k1f: {k1f}, k2f: {k2f}, kf: {kf}, x: {x}");
+                        Console.WriteLine($"Varying s1: Yielding new curve with parameters: sign: {sign}, s1: {tempS1}, s2: {s2}, s3: {s3}, ki: {ki}, k1f: {k1f}, k2f: {k2f}, kf: {kf}, x: {x}");
                         testCurve.Reset();
                         ClothoidSegment ca = new ClothoidSegment((float)ki, (float)x, (float)tempS1);
                         ClothoidSegment cb = new ClothoidSegment((float)k1f, (float)-x, (float)s2);
@@ -322,7 +324,7 @@ namespace Clothoid {
                              .AddSegment(new ClothoidSegment((float)k1f, (float)-x, (float)s2))
                              .AddSegment(new ClothoidSegment((float)k2f, (float)x, (float)s3));
                         guess = testCurve.Endpoint;
-                        float dist = UnityEngine.Vector3.Distance(guess, posture2.Position);
+                        float dist = Vector3.Distance(guess, posture2.Position);
                         
                         yield return curve + testCurve;
 
@@ -334,7 +336,7 @@ namespace Clothoid {
                     }
 
                     if (minDist <= goalDist) {
-                        Debug.Log($"Min dist <= goalDist: {minDist} <= {goalDist}");
+                        Console.WriteLine($"Min dist <= goalDist: {minDist} <= {goalDist}");
                         curve += testCurve;
                         break;
                     }
@@ -390,14 +392,14 @@ namespace Clothoid {
                         
                         
                         
-                        Debug.Log($"Varying s2: Yielding new curve with parameters: s1: {s1}, s2: {tempS2}, s3: {s3}, ki: {ki}, k1f: {k1f}, k2f: {k2f}, x: {x}");
+                        Console.WriteLine($"Varying s2: Yielding new curve with parameters: s1: {s1}, s2: {tempS2}, s3: {s3}, ki: {ki}, k1f: {k1f}, k2f: {k2f}, x: {x}");
                         testCurve.Reset();
                         testCurve.AddSegment(new ClothoidSegment((float)ki, (float)x, (float)s1))
                              .AddSegment(new ClothoidSegment((float)k1f, (float)-x, (float)tempS2))
                              .AddSegment(new ClothoidSegment((float)k2f, (float)x, (float)s3));
 
                         guess = testCurve.Endpoint;
-                        float dist = UnityEngine.Vector3.Distance(guess, posture2.Position);
+                        float dist = Vector3.Distance(guess, posture2.Position);
                         yield return curve + testCurve;
 
                         if (dist < minDist) {
@@ -410,8 +412,8 @@ namespace Clothoid {
                     u++;
                 }
 
-                if (u >= maxU) Debug.Log("Attempt count exceeded!");
-                Debug.Log($"final params: x: {x}, s1: {s1}, s2: {s2}, s3: {s3}, ki: {ki}, k1f: {ki + (x * s1)}, k2f: {ki + (x * s1) - (x * s2)}, k3f: {ki + (x * s1) - (x * s2) + (x * s3)}");
+                if (u >= maxU) Console.WriteLine("Attempt count exceeded!");
+                Console.WriteLine($"final params: x: {x}, s1: {s1}, s2: {s2}, s3: {s3}, ki: {ki}, k1f: {ki + (x * s1)}, k2f: {ki + (x * s1) - (x * s2)}, k3f: {ki + (x * s1) - (x * s2) + (x * s3)}");
 
                 // The curve object should have our clothoid curve now. This is just a subset of the entire curve, the three segments that make up the curve connecting the two postures.
                 // Lets add the curve to our current built curve
@@ -420,7 +422,7 @@ namespace Clothoid {
             }
 
             for (int i = 0; i < segments.Count; i++) {
-                Debug.Log(segments[i].Description());
+                Console.WriteLine(segments[i].Description());
             }
 
             yield break;
@@ -471,23 +473,23 @@ namespace Clothoid {
             ClothoidCurve testCurve = new ClothoidCurve();
 
             //final position guess
-            UnityEngine.Vector3 guess;
+            Vector3 guess;
             //temp variable to find min distance from guess to goal
-            float minDist = Mathf.Infinity;
+            float minDist = float.PositiveInfinity;
             float goalDist = 0.01f;
 
             //first l1 and l2 guess, 1/3 of the average of the two small circular arcs connecting them.
             // Guess the initial total arc lengths of the first and second clothoid segments
             //radians                
-            thetao = Mathf.Atan2(posture1.Position.z - posture1.CircleCenter.z, posture1.Position.x - posture1.CircleCenter.x) * 180 / Mathf.PI;
-            thetaf = Mathf.Atan2(posture2.Position.z - posture1.CircleCenter.z, posture2.Position.x - posture1.CircleCenter.x) * 180 / Mathf.PI;
+            thetao = Math.Atan2(posture1.Position.Z - posture1.CircleCenter.Z, posture1.Position.X - posture1.CircleCenter.X) * 180 / Math.PI;
+            thetaf = Math.Atan2(posture2.Position.Z - posture1.CircleCenter.Z, posture2.Position.X - posture1.CircleCenter.X) * 180 / Math.PI;
             s11 = posture1.GetArcLength(thetaf-thetao);
-            thetao = Mathf.Atan2(posture1.Position.z - posture2.CircleCenter.z, posture1.Position.x - posture2.CircleCenter.x) * 180 / Mathf.PI;
-            thetaf = Mathf.Atan2(posture2.Position.z - posture2.CircleCenter.z, posture2.Position.x - posture2.CircleCenter.x) * 180 / Mathf.PI;
+            thetao = Math.Atan2(posture1.Position.Z - posture2.CircleCenter.Z, posture1.Position.X - posture2.CircleCenter.X) * 180 / Math.PI;
+            thetaf = Math.Atan2(posture2.Position.Z - posture2.CircleCenter.Z, posture2.Position.X - posture2.CircleCenter.X) * 180 / Math.PI;
             s22 = posture2.GetArcLength(thetaf-thetao);
             s1 = s2 = (s11 + s22) / 6; //first clothoid
 
-            Debug.Log("Arc Lengths");
+            Console.WriteLine("Arc Lengths");
 
             //reuse thetao and thetaf as the start and end tangent angles as well
             thetao = posture1.Angle;
@@ -508,14 +510,13 @@ namespace Clothoid {
             //v3 = posture1.Position - posture2.CircleCenter;
             //v4 = posture2.Position - posture2.CircleCenter;     
 
-            Debug.Log($"New Curvatures: {ki} to {kf}");
+            Console.WriteLine($"New Curvatures: {ki} to {kf}");
 
             if (ki == kf) {
                 //the sharpness is 0, we have either a line segment or a circle segment
                 if (ki > 0) {
                     //circle segment from p1 to p2 with radius 1/ki
                     ClothoidSegment s = new ClothoidSegment((float)ki, 0, (float)s11);
-                    s.isMirroredX = posture2.isMirroredX; //set the mirrored flag
                     curve.AddSegment(s);
                     yield return curve;
                 } else {
@@ -560,15 +561,15 @@ namespace Clothoid {
 
                     // Pick the value which matches the sign of sign
                     if (sign == 1) {
-                        Debug.Log("Sign > 0");
+                        Console.WriteLine("Sign > 0");
                         if (xplus > 0) x = xplus;
                         else x = xminus;
                     } else if (sign == -1) {
-                        Debug.Log("Sign < 0");
+                        Console.WriteLine("Sign < 0");
                         if (xplus < 0) x = xplus;
                         else x = xminus;
                     } else {
-                        Debug.Log("Sign == 0");
+                        Console.WriteLine("Sign == 0");
                         x = 0;
                     }
 
@@ -597,7 +598,7 @@ namespace Clothoid {
                     
 
                     
-                    Debug.Log($"Varying s1: Yielding new curve with parameters: sign: {sign}, s1: {tempS1}, s2: {s2}, s3: {s3}, ki: {ki}, k1f: {k1f}, k2f: {k2f}, kf: {kf}, x: {x}");
+                    Console.WriteLine($"Varying s1: Yielding new curve with parameters: sign: {sign}, s1: {tempS1}, s2: {s2}, s3: {s3}, ki: {ki}, k1f: {k1f}, k2f: {k2f}, kf: {kf}, x: {x}");
                     testCurve.Reset();
                     /*ClothoidSegment ca = new ClothoidSegment((float)ki, (float)x, (float)tempS1);
                     ClothoidSegment cb = new ClothoidSegment((float)k1f, (float)-x, (float)s2);
@@ -606,7 +607,7 @@ namespace Clothoid {
                             .AddSegment(new ClothoidSegment((float)k1f, (float)-x, (float)s2))
                             .AddSegment(new ClothoidSegment((float)k2f, (float)x, (float)s3));
                     guess = testCurve.Endpoint;
-                    float dist = UnityEngine.Vector3.Distance(guess, posture2.Position);
+                    float dist = Vector3.Distance(guess, posture2.Position);
                     
                     yield return curve + testCurve;
 
@@ -624,7 +625,7 @@ namespace Clothoid {
                 guesses.Clear();
 
                 if (minDist <= goalDist) {
-                    Debug.Log($"Min dist <= goalDist: {minDist} <= {goalDist}");
+                    Console.WriteLine($"Min dist <= goalDist: {minDist} <= {goalDist}");
                     curve += testCurve;
                     break;
                 }
@@ -679,14 +680,14 @@ namespace Clothoid {
                                                 + Mathc.SimpsonApproximation(0, s3, SetupSinTheta3(angle, ki, x, tempS2, tempS2), solverIntervals);*/
                     
                     
-                    Debug.Log($"Varying s2: Yielding new curve with parameters: s1: {s1}, s2: {tempS2}, s3: {s3}, ki: {ki}, k1f: {k1f}, k2f: {k2f}, x: {x}");
+                    Console.WriteLine($"Varying s2: Yielding new curve with parameters: s1: {s1}, s2: {tempS2}, s3: {s3}, ki: {ki}, k1f: {k1f}, k2f: {k2f}, x: {x}");
                     testCurve.Reset();
                     testCurve.AddSegment(new ClothoidSegment((float)ki, (float)x, (float)s1))
                             .AddSegment(new ClothoidSegment((float)k1f, (float)-x, (float)tempS2))
                             .AddSegment(new ClothoidSegment((float)k2f, (float)x, (float)s3));
 
                     guess = testCurve.Endpoint;
-                    float dist = UnityEngine.Vector3.Distance(guess, posture2.Position);
+                    float dist = Vector3.Distance(guess, posture2.Position);
                     yield return curve + testCurve;
 
                     guesses.Add(new Guess(s1, tempS2, s3, x, ki, kf, dist));
@@ -704,19 +705,19 @@ namespace Clothoid {
                 guesses.Clear();
 
                 if (minDist <= goalDist) {
-                    Debug.Log($"Min dist <= goalDist: {minDist} <= {goalDist}");
+                    Console.WriteLine($"Min dist <= goalDist: {minDist} <= {goalDist}");
                     curve += testCurve;
                     break;
                 }
 
                 u++;
             }
-            if (u >= maxU) Debug.Log("Attempt count exceeded!");
+            if (u >= maxU) Console.WriteLine("Attempt count exceeded!");
             
-            Debug.Log($"final params: x: {x}, s1: {s1}, s2: {s2}, s3: {s3}, ki: {ki}, k1f: {ki + (x * s1)}, k2f: {ki + (x * s1) - (x * s2)}, k3f: {ki + (x * s1) - (x * s2) + (x * s3)}");
+            Console.WriteLine($"final params: x: {x}, s1: {s1}, s2: {s2}, s3: {s3}, ki: {ki}, k1f: {ki + (x * s1)}, k2f: {ki + (x * s1) - (x * s2)}, k3f: {ki + (x * s1) - (x * s2) + (x * s3)}");
 
             for (int i = 0; i < segments.Count; i++) {
-                Debug.Log(segments[i].Description());
+                Console.WriteLine(segments[i].Description());
             }
 
             yield break;
@@ -726,7 +727,7 @@ namespace Clothoid {
         /// Create a posture for each 3 successive input polyline nodes.
         /// </summary>
         private void SetupPostures() {
-            this.Postures = Posture.CalculatePostures(polyline);
+            this.Postures = Posture.CalculatePostures(polyline.Select(a => a.ToCSVector3()).ToList());
         }
 
         /// <summary>
@@ -736,10 +737,10 @@ namespace Clothoid {
         /// <param name="numSamples"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
-        public List<UnityEngine.Vector3> GetPostureSamples(int postureIndex, int numSamples) {
+        public List<Vector3> GetPostureSamples(int postureIndex, int numSamples) {
             if (postureIndex < 0 || postureIndex >= Postures.Count) throw new ArgumentOutOfRangeException();
             Posture posture = Postures[postureIndex];
-            //Debug.Log(posture.ToString());
+            //Console.WriteLine(posture.ToString());
             return posture.GetSamples(numSamples);
         }
 
@@ -750,18 +751,18 @@ namespace Clothoid {
         /// <param name="p1"></param>
         /// <param name="p2"></param>
         /// <returns></returns>
-        public static List<UnityEngine.Vector3>[] GetSmallArcsThatConnectPostures(Posture p1, Posture p2) {
-            List<UnityEngine.Vector3> arc1;
-            List<UnityEngine.Vector3> arc2;
+        public static List<Vector3>[] GetSmallArcsThatConnectPostures(Posture p1, Posture p2) {
+            List<Vector3> arc1;
+            List<Vector3> arc2;
             int numSamples = 100;
-            double thetao = Mathf.Atan2(p1.Position.z - p1.CircleCenter.z, p1.Position.x - p1.CircleCenter.x) * 180 / Mathf.PI;
-            double thetaf = Mathf.Atan2(p2.Position.z - p1.CircleCenter.z, p2.Position.x - p1.CircleCenter.x) * 180 / Mathf.PI;
+            double thetao = Math.Atan2(p1.Position.Z - p1.CircleCenter.Z, p1.Position.X - p1.CircleCenter.X) * 180 / Math.PI;
+            double thetaf = Math.Atan2(p2.Position.Z - p1.CircleCenter.Z, p2.Position.X - p1.CircleCenter.X) * 180 / Math.PI;
             arc1 = p1.GetSamples(numSamples, thetaf, thetao);
-            thetao = Mathf.Atan2(p1.Position.z - p2.CircleCenter.z, p1.Position.x - p2.CircleCenter.x) * 180 / Mathf.PI;
-            thetaf = Mathf.Atan2(p2.Position.z - p2.CircleCenter.z, p2.Position.x - p2.CircleCenter.x) * 180 / Mathf.PI;
+            thetao = Math.Atan2(p1.Position.Z - p2.CircleCenter.Z, p1.Position.X - p2.CircleCenter.X) * 180 / Math.PI;
+            thetaf = Math.Atan2(p2.Position.Z - p2.CircleCenter.Z, p2.Position.X - p2.CircleCenter.X) * 180 / Math.PI;
             arc2 = p2.GetSamples(numSamples, thetaf, thetao);
 
-            return new List<UnityEngine.Vector3>[2] {arc1, arc2};
+            return new List<Vector3>[2] { arc1, arc2 };
         }
 
         public Func<double, double> SetupCosTheta1(double thetaI, double curvature, double sharpness) {

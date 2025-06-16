@@ -1,85 +1,29 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Numerics;
+using UnityEngine.U2D.IK;
 
 namespace Clothoid
 {
     public class ClothoidSolutionBertolazzi : ClothoidSolution
     {
-        static readonly double[] fn = new double[11] {
-            0.49999988085884732562,
-            1.3511177791210715095,
-            1.3175407836168659241,
-            1.1861149300293854992,
-            0.7709627298888346769,
-            0.4173874338787963957,
-            0.19044202705272903923,
-            0.06655998896627697537,
-            0.022789258616785717418,
-            0.0040116689358507943804,
-            0.0012192036851249883877
-        };
-        static readonly double[] fd = new double[12] {
-            1.0,
-            2.7022305772400260215,
-            4.2059268151438492767,
-            4.5221882840107715516,
-            3.7240352281630359588,
-            2.4589286254678152943,
-            1.3125491629443702962,
-            0.5997685720120932908,
-            0.20907680750378849485,
-            0.07159621634657901433,
-            0.012602969513793714191,
-            0.0038302423512931250065
-        };
-        static readonly double[] gn = new double[11] {
-            0.50000014392706344801,
-            0.032346434925349128728,
-            0.17619325157863254363,
-            0.038606273170706486252,
-            0.023693692309257725361,
-            0.007092018516845033662,
-            0.0012492123212412087428,
-            0.00044023040894778468486,
-            -8.80266827476172521e-6,
-            -1.4033554916580018648e-8,
-            2.3509221782155474353e-10
-        };
-        static readonly double[] gd = new double[12]{
-            1.0,
-            2.0646987497019598937,
-            2.9109311766948031235,
-            2.6561936751333032911,
-            2.0195563983177268073,
-            1.1167891129189363902,
-            0.57267874755973172715,
-            0.19408481169593070798,
-            0.07634808341431248904,
-            0.011573247407207865977,
-            0.0044099273693067311209,
-            -0.00009070958410429993314
-        };
         /// <summary>
-        /// And epsilon for the fresnel calculations
+        /// Threshold for A to solve the fresnel equation with different solutions
         /// </summary>
-        const double EPS = 1e-15;
-        const double PI_2 = Math.PI / 2;
-        /// <summary>
-        /// Threshold for A to solve the fresnel equation with different domains
-        /// </summary>
-        public static double A_THRESHOLD = 1E-2;
+        public static readonly double A_THRESHOLD = 1E-2;
         /// <summary>
         /// When A is small the momenta integrals are evaluated with an infinite series.
         /// Turns out this series converges very fast so we only need the first few terms.
         /// This is that number of terms.
         /// </summary>
-        public static int A_SMALL_SERIES_SIZE = 3;
+        public static readonly int A_SMALL_SERIES_SIZE = 3;
         /// <summary>
         /// Root finding tolerance
         /// </summary>
-        private static double ROOT_TOLERANCE = 1E-2;
+        private static readonly double ROOT_TOLERANCE = 1E-2;
+        /// <summary>
+        /// These are coefficients used in the initial guess of A in the root finding algorithm
+        /// </summary>
         private static readonly double[] CF = new double[6] { 2.989696028701907, 0.716228953608281, -0.458969738821509, -0.502821153340377, 0.261062141752652, -0.045854475238709 };
 
         public override ClothoidCurve CalculateClothoidCurve(List<UnityEngine.Vector3> inputPolyline, float allowableError = 0.1F, float endpointWeight = 1)
@@ -87,31 +31,24 @@ namespace Clothoid
             throw new System.NotImplementedException();
         }
 
-        public static ClothoidCurve BuildSegmentsFromStandardFrame(HermiteData point1, HermiteData point2)
+        public static double[] SolveG1Parameters(HermiteData point1, HermiteData point2)
         {
-            List<ClothoidSegment> segments = new List<ClothoidSegment>();
-            if (point1.x != -1 || point1.z != 0 || point2.x != 1 || point2.z != 0) return ClothoidCurve.FromSegments(segments);
-            return ClothoidCurve.FromSegments(segments);
+            ClothoidCurve c = G1(point1.x, point1.z, point1.tangentAngle, point2.x, point2.z, point2.tangentAngle);
+            return new double[4] { c[0].Sharpness, c[0].StartCurvature, c.AngleOffset, c.TotalArcLength };
         }
 
-        public static float[] SolveG1Parameters(HermiteData point1, HermiteData point2)
+        public static double[] SolveG1Parameters(ClothoidCurve curve)
         {
-            ClothoidCurve c = G1Curve(point1.x, point1.z, point1.tangentAngle, point2.x, point2.z, point2.tangentAngle, true);
-            return new float[4] { c[0].Sharpness, c[0].StartCurvature, c.AngleOffset, c.TotalArcLength };
-        }
-
-        public static float[] SolveG1Parameters(ClothoidCurve curve)
-        {
-            return new float[4] { curve[0].Sharpness, curve[0].StartCurvature, curve.AngleOffset, curve.TotalArcLength };
+            return new double[4] { curve[0].Sharpness, curve[0].StartCurvature, curve.AngleOffset, curve.TotalArcLength };
         }
 
         public static ClothoidCurve G1Spline(Posture[] data)
         {
-            ClothoidCurve c = new ClothoidCurve();
+            ClothoidCurve c = new();
 
             for (int i = 0; i + 1 < data.Length; i++)
             {
-                c += G1Curve(data[i].X, data[i].Z, data[i].Angle, data[i + 1].X, data[i + 1].Z, data[i + 1].Angle, false);
+                c += G1(data[i].X, data[i].Z, data[i].Angle, data[i + 1].X, data[i + 1].Z, data[i + 1].Angle);
             }
 
             c.Offset = data[0].Position;
@@ -122,17 +59,20 @@ namespace Clothoid
 
         /// <summary>
         /// Get a G1 clothoid curve using two points and associated tangents.
-        /// Angles should be in degrees.
+        /// Angles should be in radians. Like all G1 and G2 solutions, this 
+        /// requires returning a ClothoidCurve object in order to leverage
+        /// the Offset and AngleOffset properties, which are required for
+        /// the endpoints to interpolate.
         /// </summary>
-        /// <param name="x0"></param>
-        /// <param name="z0"></param>
-        /// <param name="t0"></param>
-        /// <param name="x1"></param>
-        /// <param name="z1"></param>
-        /// <param name="t1"></param>
+        /// <param name="x0">start point x</param>
+        /// <param name="z0">start point z</param>
+        /// <param name="t0">start tangent angle in radians</param>
+        /// <param name="x1">end point x</param>
+        /// <param name="z1">end point z</param>
+        /// <param name="t1">end point tangent angle in radians</param>
         /// <param name="addOffsets">If true, the returned curve will be offet and rotated by the first point and its tangent. We might want to leave it false if we are building a G1 spline, in which case we would only offset and rotate the entire G1 curve by the first point after building the whole thing. See <see cref="G1Spline"/></param>
         /// <returns></returns>
-        public static ClothoidCurve G1Curve(double x0, double z0, double t0, double x1, double z1, double t1, bool addOffsets)
+        public static ClothoidCurve G1(double x0, double z0, double t0, double x1, double z1, double t1)
         {
             double dx = x1 - x0;
             double dz = z1 - z0;
@@ -144,29 +84,28 @@ namespace Clothoid
             //NOTE: At the moment I have t1 and t0 swapped to test
             //solving the root for the curve rotated by 180 deg. 
             //Then rotating the solution curve by another 180 deg.
-            double phi0 = NormalizeAngle((t0 * Math.PI / 180) - phi);
-            double phi1 = NormalizeAngle((t1 * Math.PI / 180) - phi);
+            double phi0 = NormalizeAngle(t0 - phi);
+            double phi1 = NormalizeAngle(t1 - phi);
 
             double e = 1E-4;
             //UnityEngine.Debug.Log($"phi0: {phi0} | phi1: {phi1}");
             if ((Math.Abs(phi0) < e && Math.Abs(phi1) == 0) || (phi0 + Math.PI < e && phi1 - Math.PI < e) || (phi0 - Math.PI < e && phi1 + Math.PI < e))
             {
                 //UnityEngine.Debug.Log("G1 Curve is a line!");
-                ClothoidCurve cc = new ClothoidCurve().AddLine((float)r);
-                if (addOffsets)
+                //ClothoidCurve cc = new ClothoidCurve().AddLine((float)r);
+                /*if (addOffsets)
                 {
                     cc.Offset = new UnityEngine.Vector3((float)x1, 0, (float)z1);
                     cc.AngleOffset = (float)t0;
-                }
-                return cc;
+                }*/
+                return ClothoidCurve.FromSegments(new ClothoidSegment(0, 0, (float)r));
             }
 
             double d = phi1 - phi0;
-            double absd = Math.Abs(d);
 
             //Calculate the bounds of the solution A_max and T_max
-            double Tmax = Math.Max(0, PI_2 + (Math.Sign(phi1) * phi0));
-            double Amax = Tmax == 0 ? absd : absd + (2 * Tmax * (1 + Math.Sqrt(1 + (absd / Tmax))));
+            //double Tmax = Math.Max(0, PI_2 + (Math.Sign(phi1) * phi0));
+            //double Amax = Tmax == 0 ? absd : absd + (2 * Tmax * (1 + Math.Sqrt(1 + (absd / Tmax))));
 
             double g;
             double dg;
@@ -193,7 +132,7 @@ namespace Clothoid
             }
             else
             {
-                UnityEngine.Debug.Log($"Convergence iterations: {u}\nAmax: {Amax}\nTmax: {Tmax}\nA: {A}");
+                //UnityEngine.Debug.Log($"Convergence iterations: {u}\nAmax: {Amax}\nTmax: {Tmax}\nA: {A}");
             }
 
             //UnityEngine.Debug.Log($"Number of attempts: {u}");
@@ -207,20 +146,16 @@ namespace Clothoid
             if (s <= 0)
             {
                 //UnityEngine.Debug.LogWarning($"ArcLength Negative or Zero! s: {s} | r: {r} | intCS[0]: {intCS[0]} | intCS[1]: {intCS[1]} | phi0: {phi0 * 180 / Math.PI} | phi1: {phi1 * 180 / Math.PI} | A: {A} | d: {d * 180 / Math.PI}");
-                return G1CurveM(x0, z0, t0, x1, z1, t1, addOffsets);
+                return G1CurveM(x0, z0, t0, x1, z1, t1);
+                //return new();
             }
 
             double startCurvature = (d - A) / s;
-            double sharpness = (2 * A) / (s * s);
+            double sharpness = 2 * A / (s * s);
 
-            //ClothoidSegment segment = new ClothoidSegment((float)startCurvature, (float)sharpness, (float)s);
-
-            ClothoidCurve c = new ClothoidCurve().AddSegment(new ClothoidSegment((float)startCurvature, (float)sharpness, (float)s));
-            if (addOffsets)
-            {
-                c.Offset = new UnityEngine.Vector3((float)x0, 0, (float)z0);
-                c.AngleOffset = (float)t0;
-            }
+            ClothoidCurve c = ClothoidCurve.FromSegments(new ClothoidSegment(startCurvature, sharpness, s));
+            c.Offset = new Vector3((float)x0, 0, (float)z0);
+            c.AngleOffset = (float)t0;
             return c;
         }
 
@@ -236,7 +171,7 @@ namespace Clothoid
         /// <param name="t1"></param>
         /// <param name="addOffsets"></param>
         /// <returns></returns>
-        public static ClothoidCurve G1CurveM(double x0, double z0, double t0, double x1, double z1, double t1, bool addOffsets)
+        public static ClothoidCurve G1CurveM(double x0, double z0, double t0, double x1, double z1, double t1)
         /*{
             ClothoidCurve c = G1Curve(x0, z0, t1, x1, z1, t0, false);
             if (addOffsets)
@@ -256,19 +191,16 @@ namespace Clothoid
             //NOTE: At the moment I have t1 and t0 swapped to test
             //solving the root for the curve rotated by 180 deg. 
             //Then rotating the solution curve by another 180 deg.
-            double phi0 = NormalizeAngle((t1 * Math.PI / 180) - phi);
-            double phi1 = NormalizeAngle((t0 * Math.PI / 180) - phi);
+            double phi0 = NormalizeAngle(t1 - phi);
+            double phi1 = NormalizeAngle(t0 - phi);
 
             double e = 1E-4;
             if ((Math.Abs(phi0) < e && Math.Abs(phi1) == 0) || (phi0 + Math.PI < e && phi1 - Math.PI < e) || (phi0 - Math.PI < e && phi1 + Math.PI < e))
             {
-                UnityEngine.Debug.Log("G1 Curve is a line!");
+                //UnityEngine.Debug.Log("G1 Curve is a line!");
                 ClothoidCurve cc = new ClothoidCurve().AddLine((float)r);
-                if (addOffsets)
-                {
-                    cc.Offset = new UnityEngine.Vector3((float)x1, 0, (float)z1);
-                    cc.AngleOffset = (float)t0;
-                }
+                cc.Offset = new Vector3((float)x1, 0, (float)z1);
+                cc.AngleOffset = (float)t0;
                 return cc;
             }
 
@@ -318,16 +250,11 @@ namespace Clothoid
             }
 
             double startCurvature = (d - A) / s;
-            double sharpness = (2 * A) / (s * s);
+            double sharpness = 2 * A / (s * s);
 
-            //ClothoidSegment segment = new ClothoidSegment((float)startCurvature, (float)sharpness, (float)s);
-
-            ClothoidCurve c = new ClothoidCurve().AddSegment(new ClothoidSegment((float)startCurvature, (float)sharpness, (float)s));
-            if (addOffsets)
-            {
-                c.Offset = new UnityEngine.Vector3((float)x1, 0, (float)z1);
-                c.AngleOffset = (float)t1 + 180;
-            }
+            ClothoidCurve c = ClothoidCurve.FromSegments(new ClothoidSegment((float)startCurvature, (float)sharpness, (float)s));
+            c.Offset = new Vector3((float)x1, 0, (float)z1);
+            c.AngleOffset = (float)t1 + 180;
             return c;
         }
 
@@ -445,6 +372,8 @@ namespace Clothoid
 
         private static List<double[]> EvalXYaSmall2(int k, double a, double b, int p)
         {
+            if (a == 0) return EvalXYaZero(b, k);
+
             List<double[]> XY = EvalXYaZero(b, k + (4 * p) + 2);
             double[] X0 = XY[0];
             double[] Y0 = XY[1];
@@ -470,12 +399,12 @@ namespace Clothoid
                     //term1 = Math.Pow(a / 2, 2 * n) * Math.Pow(-1, n) / Mathc.Fact(2 * n);
                     term2 = X0[(4 * n) + k] - (a * Y0[(4 * n) + k + 2] / (2 * ((2 * n) + 1)));
                     term3 = Y0[(4 * n) + k] - (a * X0[(4 * n) + k + 2] / (2 * ((2 * n) + 1)));
-
-                    UnityEngine.Debug.LogWarning($"{z} | {zz} | {zzz}");
+                    //UnityEngine.Debug.LogWarning($"{z} | {zz} | {zzz}");
 
                     if (!double.IsNormal(term1) || !double.IsNormal(term2) || !double.IsNormal(term3))
                     {
-                        UnityEngine.Debug.LogWarning($"EvalXYaSmall2 terms not normal: term1: {term1} | term2: {term2} | term3: {term3}");
+                        //UnityEngine.Debug.Log($"n: {n} | term1: {term1} | term2: {term2} | term3: {term3}");
+                        //UnityEngine.Debug.Log($"k: {k} | a: {a} | b: {b} | p: {p}");
                     }
 
                     X[nk] += term1 * term2;
@@ -528,54 +457,55 @@ namespace Clothoid
             return new double[2] { XY[0][0], XY[1][0] };
         }
 
-        private static List<double[]> EvalXYaLarge(int nk, double a, double b)
+        public static List<double[]> EvalXYaLarge(int n, double a, double b)
         {
-            if (nk > 3 || nk < 0) throw new ArgumentOutOfRangeException();
+            if (n > 3 || n < 0) throw new ArgumentOutOfRangeException();
 
             double s = a > 0 ? 1 : -1;
             double absa = Math.Abs(a);
             double z = Math.Sqrt(absa) / Math.Sqrt(Math.PI);
-            double ell = s * b / (Math.Sqrt(Math.PI) * Math.Sqrt(absa));
+            double ell = s * b / Math.Sqrt(Math.PI * absa);
             double g = -s * b * b / (2 * absa);
             double cg = Math.Cos(g) / z;
             double sg = Math.Sin(g) / z;
-            List<double[]> CS1 = FresnelCS(nk, ell);
-            List<double[]> CSz = FresnelCS(nk, ell + z);
+            List<double[]> CS1 = FresnelCS(n, ell);
+            List<double[]> CSz = FresnelCS(n, ell + z);
             double[] C1 = CS1[0];
             double[] S1 = CS1[1];
             double[] Cz = CSz[0];
             double[] Sz = CSz[1];
 
-            double dC0 = Cz[0] - C1[0];
-            double dS0 = Sz[0] - S1[0];
+            double[] dC = new double[n];
+            double[] dS = new double[n];
 
+            for (int i = 0; i < n; i++)
+            {
+                dC[i] = Cz[i] - C1[i];
+                dS[i] = Sz[i] - S1[i];
+            }
             double[] X = new double[3];
             double[] Y = new double[3];
 
             //UnityEngine.Debug.LogWarning($"Number of elements in CS1: ({C1.Length}, {S1.Length}) | in CSZ: ({Cz.Length}, {Sz.Length})");
 
-            X[0] = (cg * dC0) - (s * sg * dS0);
-            Y[0] = (sg * dC0) + (s * cg * dS0);
-            if (nk > 1)
+            X[0] = (cg * dC[0]) - (s * sg * dS[0]);
+            Y[0] = (sg * dC[0]) + (s * cg * dS[0]);
+            if (n > 1)
             {
                 cg /= z;
                 sg /= z;
-                double dC1 = Cz[1] - C1[1];
-                double dS1 = Sz[1] - S1[1];
-                double DC = dC1 - (ell * dC0);
-                double DS = dS1 - (ell * dS0);
+                double DC = dC[1] - (ell * dC[0]);
+                double DS = dS[1] - (ell * dS[0]);
 
                 X[1] = (cg * DC) - (s * sg * DS);
                 Y[1] = (sg * DC) + (s * cg * DS);
 
-                if (nk > 2)
+                if (n > 2)
                 {
-                    double dC2 = Cz[2] - C1[2];
-                    double dS2 = Sz[2] - S1[2];
-                    DC = dC2 + (ell * ((ell * dC0) - (2 * dC1)));
-                    DS = dS2 + (ell * ((ell * dS0) - (2 * dS1)));
                     cg /= z;
                     sg /= z;
+                    DC = dC[2] + (ell * ((ell * dC[0]) - (2 * dC[1])));
+                    DS = dS[2] + (ell * ((ell * dS[0]) - (2 * dS[1])));
                     X[2] = (cg * DC) - (s * sg * DS);
                     Y[2] = (sg * DC) + (s * cg * DS);
                 }
@@ -585,16 +515,16 @@ namespace Clothoid
         }
 
         /// <summary>
-        /// More closely resembles the paper.
+        /// More closely resembles the paper's mathematical description.
         /// </summary>
-        /// <param name="nk"></param>
+        /// <param name="n"></param>
         /// <param name="a"></param>
         /// <param name="b"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
-        private static List<double[]> EvalXYaLarge2(int nk, double a, double b)
+        public static List<double[]> EvalXYaLarge2(int n, double a, double b)
         {
-            if (nk > 3 || nk < 0) throw new ArgumentOutOfRangeException();
+            if (n > 3 || n < 0) throw new ArgumentOutOfRangeException();
 
             if (double.IsNaN(a)) UnityEngine.Debug.LogWarning($"a is NaN: {a}");
 
@@ -606,9 +536,9 @@ namespace Clothoid
             double z = s * Math.Sqrt(absa / Math.PI);
             double wm = b / Math.Sqrt(Math.PI * absa);
             double wp = wm + z;
-            double n = -b * b / (2 * a);
-            double cz = Math.Cos(n) / z;
-            double sz = Math.Sin(n) / z;
+            double t = -b * b / (2 * a);
+            double cz = Math.Cos(t) / z;
+            double sz = Math.Sin(t) / z;
 
             List<double[]> CSp = FresnelCS(3, wp);
             List<double[]> CSm = FresnelCS(3, wm);
@@ -619,7 +549,7 @@ namespace Clothoid
             X[0] = cz * dC0 - (s * sz * dS0);
             Y[0] = sz * dC0 + (s * cz * dS0);
 
-            if (nk > 1)
+            if (n > 1)
             {
                 cz /= z;
                 sz /= z;
@@ -632,7 +562,7 @@ namespace Clothoid
                 X[1] = cz * (dC0 + dC1) - (s * sz * (dS0 + dS1));
                 Y[1] = sz * (dC0 + dC1) + (s * cz * (dS0 + dS1));
 
-                if (nk > 2)
+                if (n > 2)
                 {
                     cz /= z;
                     sz /= z;
@@ -652,21 +582,22 @@ namespace Clothoid
             return new List<double[]> { X, Y };
 
         }
+
         /// <summary>
-        /// Evaluate the fresnel integral and its momenta at arc length t
+        /// Evaluate the fresnel integral and its momentae at arc length t
         /// </summary>
-        /// <param name="nk"></param>
+        /// <param name="n"></param>
         /// <param name="t"></param>
         /// <returns></returns>
-        private static List<double[]> FresnelCS(int nk, double t)
+        private static List<double[]> FresnelCS(int n, double t)
         {
-            double[] C = new double[3];
-            double[] S = new double[3];
-            FresnelCS(t, out double c, out double s);
+            double[] C = new double[n];
+            double[] S = new double[n];
+            Mathc.FresnelCS(t, out double c, out double s);
             C[0] = c;
             S[0] = s;
 
-            if (nk > 1)
+            if (n > 1)
             {
                 C[1] = C1(t);
                 S[1] = S1(t);
@@ -676,7 +607,7 @@ namespace Clothoid
                 double ctt = Math.Cos(tt);
                 C[1] = stt / Math.PI;
                 S[1] = (1 - ctt) / Math.PI;*/
-                if (nk > 2)
+                if (n > 2)
                 {
                     C[2] = C2(t); //((t * stt) - S[0]) / Math.PI;
                     S[2] = S2(t); //(C[0] - (t * ctt)) / Math.PI;
@@ -686,150 +617,19 @@ namespace Clothoid
             return new List<double[]>() { C, S };
         }
 
-        public static void FresnelCS(double y, out double C, out double S)
-        {
-            double x = Math.Abs(y);
-
-            if (x < 1.0)
-            {
-                double term, sum;
-                double s = PI_2 * (x * x);
-                double t = -s * s;
-
-                // Cosine integral series
-                double twofn = 0.0;
-                double fact = 1.0;
-                double denterm = 1.0;
-                double numterm = 1.0;
-                sum = 1.0;
-                do
-                {
-                    twofn += 2.0;
-                    fact *= twofn * (twofn - 1.0);
-                    denterm += 4.0;
-                    numterm *= t;
-                    term = numterm / (fact * denterm);
-                    sum += term;
-                } while (Math.Abs(term) > EPS * Math.Abs(sum));
-
-                C = x * sum;
-
-                // Sine integral series
-                twofn = 1.0;
-                fact = 1.0;
-                denterm = 3.0;
-                numterm = 1.0;
-                sum = 1.0 / 3.0;
-                do
-                {
-                    twofn += 2.0;
-                    fact *= twofn * (twofn - 1.0);
-                    denterm += 4.0;
-                    numterm *= t;
-                    term = numterm / (fact * denterm);
-                    sum += term;
-                } while (Math.Abs(term) > EPS * Math.Abs(sum));
-
-                S = PI_2 * sum * (x * x * x);
-            }
-            else if (x < 6.0)
-            {
-                // Rational approximation for f
-                double sumn = 0.0;
-                double sumd = fd[11];
-                for (int k = 10; k >= 0; --k)
-                {
-                    sumn = fn[k] + x * sumn;
-                    sumd = fd[k] + x * sumd;
-                }
-                double f = sumn / sumd;
-
-                // Rational approximation for g
-                sumn = 0.0;
-                sumd = gd[11];
-                for (int k = 10; k >= 0; --k)
-                {
-                    sumn = gn[k] + x * sumn;
-                    sumd = gd[k] + x * sumd;
-                }
-                double g = sumn / sumd;
-
-                double U = PI_2 * (x * x);
-                double SinU = Math.Sin(U);
-                double CosU = Math.Cos(U);
-
-                C = 0.5 + f * SinU - g * CosU;
-                S = 0.5 - f * CosU - g * SinU;
-            }
-            else
-            {
-                // x >= 6.0; asymptotic expansions for f and g
-                double s = Math.PI * x * x;
-                double t = -1 / (s * s);
-
-                // Expansion for f
-                double numterm = -1.0;
-                double term = 1.0;
-                double sum = 1.0;
-                double oldterm = 1.0;
-                double eps10 = 0.1 * EPS;
-                double absterm;
-
-                do
-                {
-                    numterm += 4.0;
-                    term *= numterm * (numterm - 2.0) * t;
-                    sum += term;
-                    absterm = Math.Abs(term);
-                    if (oldterm < absterm)
-                    {
-                        throw new Exception($"In FresnelCS f not converged to eps, x = {x}, oldterm = {oldterm}, absterm = {absterm}");
-                    }
-                    oldterm = absterm;
-                } while (absterm > eps10 * Math.Abs(sum));
-
-                double f = sum / (Math.PI * x);
-
-                // Expansion for g
-                numterm = -1.0;
-                term = 1.0;
-                sum = 1.0;
-                oldterm = 1.0;
-
-                do
-                {
-                    numterm += 4.0;
-                    term *= numterm * (numterm + 2.0) * t;
-                    sum += term;
-                    absterm = Math.Abs(term);
-                    if (oldterm < absterm)
-                    {
-                        throw new Exception($"In FresnelCS g not converged to eps, x = {x}, oldterm = {oldterm}, absterm = {absterm}");
-                    }
-                    oldterm = absterm;
-                } while (absterm > eps10 * Math.Abs(sum));
-
-                double g = sum / ((Math.PI * x) * (Math.PI * x * x));
-
-                double U = PI_2 * (x * x);
-                double SinU = Math.Sin(U);
-                double CosU = Math.Cos(U);
-
-                C = 0.5 + f * SinU - g * CosU;
-                S = 0.5 - f * CosU - g * SinU;
-            }
-
-            if (y < 0)
-            {
-                C = -C;
-                S = -S;
-            }
-        }
-
-        private static List<double[]> GeneralizedFresnelCS(int nk, double a, double b, double c)
+        /// <summary>
+        /// Compute the Generalized Fresnel integral as described by Bertolazzi and Frego.
+        /// </summary>
+        /// <param name="n"></param>
+        /// <param name="a"></param>
+        /// <param name="b"></param>
+        /// <param name="c"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        private static List<double[]> GeneralizedFresnelCS(int n, double a, double b, double c)
         {
             //UnityEngine.Debug.Log($"nk: {nk}, a: {a}, b: {b}, c: {c}");
-            if (nk < 1 || nk > 3) throw new ArgumentOutOfRangeException($"Value of index: {nk} | Expected value between 1 and 3 inclusive.");
+            if (n < 1 || n > 3) throw new ArgumentOutOfRangeException($"Value of index: {n} | Expected value between 1 and 3 inclusive.");
             double cc = Math.Cos(c);
             double sc = Math.Sin(c);
             List<double[]> CS;
@@ -837,23 +637,23 @@ namespace Clothoid
             if (Math.Abs(a) < A_THRESHOLD)
             {
                 //UnityEngine.Debug.Log("A < THRESHOLD");
-                CS = EvalXYaSmall2(nk, a, b, A_SMALL_SERIES_SIZE);
+                CS = EvalXYaSmall(n, a, b, A_SMALL_SERIES_SIZE);
             }
             else
             {
                 //UnityEngine.Debug.Log("A >= THRESHOLD");
-                CS = EvalXYaLarge(nk, a, b);
+                CS = EvalXYaLarge(n, a, b);
             }
 
-            double xx;
-            double yy;
+            double ci;
+            double si;
 
-            for (int i = 0; i < nk; i++)
+            for (int i = 0; i < n; i++)
             {
-                xx = CS[0][i];
-                yy = CS[1][i];
-                CS[0][i] = (xx * cc) - (yy * sc);
-                CS[1][i] = (xx * sc) + (yy * cc);
+                ci = CS[0][i];
+                si = CS[1][i];
+                CS[0][i] = (ci * cc) - (si * sc);
+                CS[1][i] = (ci * sc) + (si * cc);
             }
 
             return CS;
@@ -865,41 +665,51 @@ namespace Clothoid
             return new double[] { CS[0][0], CS[1][0] };
         }
 
-        private static float C0(double t)
+        private static double C0(double t)
         {
             return Mathc.C((float)t);
         }
 
-        private static float S0(double t)
+        private static double S0(double t)
         {
             return Mathc.S((float)t);
         }
 
-        private static float C1(double t)
+        private static double C1(double t)
         {
-            return (float)(Math.Sin(Math.PI * t * t / 2) / Math.PI);
+            return Math.Sin(Math.PI * t * t / 2) / Math.PI;
         }
 
-        private static float S1(double t)
+        private static double S1(double t)
         {
-            return (float)((1 - Math.Cos(Math.PI * t * t / 2)) / Math.PI);
+            return (1 - Math.Cos(Math.PI * t * t / 2)) / Math.PI;
         }
 
-        private static float C2(double t)
+        private static double C2(double t)
         {
-            return (float)(((t * Math.Sin(Math.PI * t * t / 2)) - S0(t)) / Math.PI);
+            return ((t * Math.Sin(Math.PI * t * t / 2)) - S0(t)) / Math.PI;
         }
 
-        private static float S2(double t)
+        private static double S2(double t)
         {
-            return (float)((C0(t) - (t * Math.Cos(Math.PI * t * t / 2))) / Math.PI);
+            return (C0(t) - (t * Math.Cos(Math.PI * t * t / 2))) / Math.PI;
         }
 
+        /// <summary>
+        /// Evaluate the clothoid curve along its arc length using the internal GeneralizedFresnelCS function instead of the built in sampling methods in the ClothoidCurve class. 
+        /// </summary>
+        /// <param name="arcLength"></param>
+        /// <param name="curvature"></param>
+        /// <param name="sharpness"></param>
+        /// <param name="startAngle"></param>
+        /// <param name="start"></param>
+        /// <param name="numSamples"></param>
+        /// <returns></returns>
         public static List<UnityEngine.Vector3> Eval(float arcLength, float curvature, float sharpness, float startAngle, Vector3 start, int numSamples = 100)
         {
             double x0 = start.X;
             double y0 = start.Z;
-            List<UnityEngine.Vector3> points = new List<UnityEngine.Vector3>();
+            List<UnityEngine.Vector3> points = new();
             double[] XY;
             double increment = arcLength / numSamples;
             for (double s = 0; s < arcLength; s += increment)

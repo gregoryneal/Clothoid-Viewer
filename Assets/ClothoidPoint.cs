@@ -11,12 +11,12 @@ namespace Clothoid
         public double x;
         public double z;
         /// <summary>
-        /// The tangent angle in degrees from the positive X-axis.
+        /// The tangent angle in radians from the positive X-axis.
         /// </summary>
         public double tangentAngle;
         public double curvature;
 
-        public Vector3 Position => new Vector3((float)x, 0, (float)z);
+        public Vector3 Position => new((float)x, 0, (float)z);
 
 
         public static HermiteData[] FromPostures(Posture[] postures)
@@ -25,7 +25,7 @@ namespace Clothoid
 
             for (int i = 0; i < data.Length; i++)
             {
-                HermiteData d = new HermiteData()
+                HermiteData d = new()
                 {
                     curvature = postures[i].Curvature,
                     x = postures[i].X,
