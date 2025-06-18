@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Clothoid {
+namespace ClothoidX {
 
     [RequireComponent(typeof(LineRenderer))]
     public class ClothoidGenerator : MonoBehaviour

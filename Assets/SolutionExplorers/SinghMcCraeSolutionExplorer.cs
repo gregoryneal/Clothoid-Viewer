@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using Clothoid;
+using ClothoidX;
 using UnityEngine;
 
 public class SinghMcCraeSolutionExplorer : MonoBehaviour
@@ -63,7 +63,7 @@ public class SinghMcCraeSolutionExplorer : MonoBehaviour
 
     void RedrawCurve()
     {
-        ClothoidCurve c = ClothoidSolutionSinghMcCrae.G2(drawingPoints.Select(p => p.ToCSVector3()).ToList());
+        ClothoidCurve c = ClothoidSolutionSinghMcCrae.G2Spline(drawingPoints.Select(p => p.ToCSVector3()).ToList());
         Helpers.DrawOrderedVector3s(c.GetSamples(c.Count * 100), this.lr2);
     }
 }
